@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FastImage from 'react-native-fast-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
-import { PlaylistRepository } from '../repositories/PlaylistRepository';
+import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import type { Playlist } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');

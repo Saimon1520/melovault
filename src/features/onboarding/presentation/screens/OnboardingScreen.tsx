@@ -6,8 +6,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import { palette } from '@/design-system/tokens/colors';
-import { MediaScanner } from '@/infrastructure/filesystem/MediaScanner';
-import { useLibraryStore } from '@/features/library/store/libraryStore';
+import { ScanLibraryUseCase, type ScanResult } from '@/features/library/domain/usecases/ScanLibraryUseCase';
+import type { ScanProgress } from '@/infrastructure/filesystem/MediaScanner';
+
+const scanUseCase = new ScanLibraryUseCase();
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -20,7 +22,6 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [scanProgress, setScanProgress] = useState(0);
   const [scanTotal, setScanTotal] = useState(0);
   const [scanCount, setScanCount] = useState(0);
-  const { setSongs } = useLibraryStore();
 
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {
@@ -53,12 +54,14 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
   const startScan = async () => {
     try {
-      const songs = await MediaScanner.scanAll((current, total) => {
-        setScanProgress(current);
-        setScanTotal(total);
-        setScanCount(current);
+      const result = await scanUseCase.execute((progress: ScanProgress) => {
+        setScanProgress(progress.scanned);
+        setScanTotal(progress.total);
+        setScanCount(progress.scanned);
       });
-      setSongs(songs);
+      if (result.success) {
+        setScanCount(result.data?.total ?? 0);
+      }
       setStep('done');
     } catch (e) {
       Alert.alert('Error al escanear', 'No se pudieron cargar los archivos de audio. Puedes intentarlo de nuevo desde Ajustes.');

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useProgress, useActiveTrack, State, usePlaybackState } from 'react-native-track-player';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
-import { usePlayerStore } from '../store/playerStore';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 
 const service = TrackPlayerService.getInstance();
