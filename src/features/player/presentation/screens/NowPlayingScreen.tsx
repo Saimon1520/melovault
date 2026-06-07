@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  useAnimatedGestureHandler, runOnJS, interpolate, Extrapolation,
+  runOnJS, interpolate, Extrapolation,
 } from 'react-native-reanimated';
-import { PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import FastImage from 'react-native-fast-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
@@ -50,18 +50,17 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
     artworkScale.value = withSpring(isPlaying ? 1 : 0.88, { damping: 20, stiffness: 150 });
   }, [isPlaying]);
 
-  const dismissGesture = useAnimatedGestureHandler({
-    onActive: ({ translationY: ty }) => {
+  const dismissGesture = Gesture.Pan()
+    .onUpdate(({ translationY: ty }) => {
       if (ty > 0) translateY.value = ty;
-    },
-    onEnd: ({ translationY: ty, velocityY }) => {
+    })
+    .onEnd(({ translationY: ty, velocityY }) => {
       if (ty > 120 || velocityY > 800) {
         runOnJS(onClose)();
       } else {
         translateY.value = withSpring(0, { damping: 20 });
       }
-    },
-  });
+    });
 
   const screenStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -76,7 +75,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PanGestureHandler onGestureEvent={dismissGesture}>
+      <GestureDetector gesture={dismissGesture}>
         <Animated.View style={[screenStyle, {
           flex: 1,
           backgroundColor: palette.surface0,
@@ -211,7 +210,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
             </ScrollView>
           )}
         </Animated.View>
-      </PanGestureHandler>
+      </GestureDetector>
 
       {/* Sleep Timer — renders badge + modal */}
       <SleepTimerModal visible={showSleepTimer} onClose={() => setShowSleepTimer(false)} />

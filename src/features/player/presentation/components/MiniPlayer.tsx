@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, useAnimatedGestureHandler, runOnJS,
+  useSharedValue, useAnimatedStyle, withSpring, runOnJS,
   withTiming, interpolate, Extrapolation,
 } from 'react-native-reanimated';
-import { PanGestureHandler } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import FastImage from 'react-native-fast-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
@@ -27,16 +27,15 @@ export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
 
   const progress = duration > 0 ? position / duration : 0;
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onActive: (event) => {
-      translateX.value = event.translationX * 0.3;
-    },
-    onEnd: (event) => {
-      if (event.translationX < -60) runOnJS(skipToNext)();
-      else if (event.translationX > 60) runOnJS(skipToPrevious)();
+  const swipeGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = e.translationX * 0.3;
+    })
+    .onEnd((e) => {
+      if (e.translationX < -60) runOnJS(skipToNext)();
+      else if (e.translationX > 60) runOnJS(skipToPrevious)();
       translateX.value = withSpring(0);
-    },
-  });
+    });
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateX: translateX.value }],
@@ -45,7 +44,7 @@ export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
   if (!activeTrack) return null;
 
   return (
-    <PanGestureHandler onGestureEvent={gestureHandler}>
+    <GestureDetector gesture={swipeGesture}>
       <Animated.View style={[containerStyle, {
         marginHorizontal: 8,
         marginBottom: 6,
@@ -115,6 +114,6 @@ export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
           )}
         </Pressable>
       </Animated.View>
-    </PanGestureHandler>
+    </GestureDetector>
   );
 }
