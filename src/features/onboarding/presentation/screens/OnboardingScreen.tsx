@@ -9,7 +9,11 @@ import { palette } from '@/design-system/tokens/colors';
 import { ScanLibraryUseCase, type ScanResult } from '@/features/library/domain/usecases/ScanLibraryUseCase';
 import type { ScanProgress } from '@/infrastructure/filesystem/MediaScanner';
 
-const scanUseCase = new ScanLibraryUseCase();
+let _scanUseCase: ScanLibraryUseCase | null = null;
+function getScanUseCase() {
+  if (!_scanUseCase) _scanUseCase = new ScanLibraryUseCase();
+  return _scanUseCase;
+}
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -54,7 +58,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
   const startScan = async () => {
     try {
-      const result = await scanUseCase.execute((progress: ScanProgress) => {
+      const result = await getScanUseCase().execute((progress: ScanProgress) => {
         setScanProgress(progress.scanned);
         setScanTotal(progress.total);
         setScanCount(progress.scanned);

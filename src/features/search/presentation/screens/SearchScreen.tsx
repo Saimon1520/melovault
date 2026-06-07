@@ -15,7 +15,11 @@ import { useActiveTrack } from 'react-native-track-player';
 
 const audioService = TrackPlayerService.getInstance();
 
-const songRepo = new SongRepository();
+let _songRepo: SongRepository | null = null;
+function getSongRepo() {
+  if (!_songRepo) _songRepo = new SongRepository();
+  return _songRepo;
+}
 
 export function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -29,7 +33,7 @@ export function SearchScreen() {
     if (!text.trim()) { setResults([]); return; }
     setLoading(true);
     const q = text.trim().toLowerCase();
-    const all = await songRepo.getAll('title', 'asc');
+    const all = await getSongRepo().getAll('title', 'asc');
     const filtered = all.filter(s =>
       s.title.toLowerCase().includes(q) ||
       s.artist.toLowerCase().includes(q) ||
