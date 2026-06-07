@@ -1,7 +1,8 @@
 import TrackPlayer, {
-  Event,
   State,
   RepeatMode as RNTPRepeatMode,
+  Capability,
+  AppKilledPlaybackBehavior,
   type Track,
 } from 'react-native-track-player';
 import type { Song, RepeatMode, PlaybackSpeed } from '@/shared/types';
@@ -18,26 +19,45 @@ export class TrackPlayerService {
 
   async setup(): Promise<void> {
     await TrackPlayer.setupPlayer({
-      maxCacheSize: 1024 * 5, // 5MB cache
+      maxCacheSize: 1024 * 5, // 5MB
+      // autoHandleInterruptions: true enables pause-on-headphone-disconnect
+      // and pause when another app takes audio focus (calls, alarms, etc.)
+      autoHandleInterruptions: true,
     });
 
     await TrackPlayer.updateOptions({
       android: {
-        appKilledPlaybackBehavior: 1, // ContinuePlayback
+        // Keep playback alive after app is killed from recents
+        appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
       },
+
+      // Full set of capabilities — shown in:
+      // • Android notification shade (expandable media notification)
+      // • Android lock screen media controls
+      // • Android Quick Settings media panel (the panel you swipe down)
+      // • iOS Control Center
+      // • iOS Lock Screen
+      // • Bluetooth headset hardware buttons
+      // • Android Wear / smartwatches
       capabilities: [
-        TrackPlayer.CAPABILITY_PLAY,
-        TrackPlayer.CAPABILITY_PAUSE,
-        TrackPlayer.CAPABILITY_STOP,
-        TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
-        TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
-        TrackPlayer.CAPABILITY_SEEK_TO,
+        Capability.Play,
+        Capability.Pause,
+        Capability.Stop,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
+        Capability.SeekTo,
+        Capability.SetRating,
       ],
+
+      // Compact view (3 buttons max in collapsed notification and Quick Settings tile)
       compactCapabilities: [
-        TrackPlayer.CAPABILITY_PLAY,
-        TrackPlayer.CAPABILITY_PAUSE,
-        TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
+        Capability.SkipToPrevious,
+        Capability.Play,
+        Capability.SkipToNext,
       ],
+
+      // Progress bar in notification
+      progressUpdateEventInterval: 1, // seconds
     });
   }
 
