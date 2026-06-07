@@ -9,6 +9,23 @@
 
 # react-native-reanimated
 -keep class com.swmansion.reanimated.** { *; }
--keep class com.facebook.react.turbomodule.** { *; }
 
-# Add any project specific keep options here:
+# react-native-worklets (JSI HostObject — R8 strips this without keep rule)
+-keep class com.swmansion.worklets.** { *; }
+
+# React Native TurboModules / Fabric (required by reanimated + worklets)
+-keep class com.facebook.react.turbomodule.** { *; }
+-keep class com.facebook.react.fabric.** { *; }
+
+# WatermelonDB
+-keep class com.nozbe.watermelondb.** { *; }
+
+# react-native-track-player
+-keep class com.doublesymmetry.trackplayer.** { *; }
+
+# react-native-fast-image
+-keep class com.dylanvann.fastimage.** { *; }
+
+# Expo modules
+-keep class expo.modules.** { *; }
+-keep class com.swmansion.gesturehandler.** { *; }
