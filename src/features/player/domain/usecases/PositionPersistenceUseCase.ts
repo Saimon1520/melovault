@@ -2,8 +2,14 @@ import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
 
-const songRepo = new SongRepository();
-const playerStateRepo = new PlayerStateRepository();
+let songRepo: SongRepository | null = null;
+let playerStateRepo: PlayerStateRepository | null = null;
+
+function repos() {
+  if (!songRepo) songRepo = new SongRepository();
+  if (!playerStateRepo) playerStateRepo = new PlayerStateRepository();
+  return { songRepo, playerStateRepo };
+}
 
 // Saves current position every N ms while playing
 const SAVE_INTERVAL_MS = 5000;
@@ -22,8 +28,8 @@ export async function startPositionPersistence(): Promise<void> {
       const track = await TrackPlayer.getActiveTrack();
       if (!track?.id) return;
 
-      await songRepo.updateLastPosition(track.id as string, position);
-      await playerStateRepo.save({
+      await repos().songRepo.updateLastPosition(track.id as string, position);
+      await repos().playerStateRepo.save({
         currentTrackId: track.id as string,
         position,
         queueIndex: await TrackPlayer.getActiveTrackIndex() ?? 0,
@@ -47,7 +53,7 @@ export async function savePositionOnTrackChange(): Promise<void> {
     const track = await TrackPlayer.getActiveTrack();
     if (!track?.id || position < 1) return;
 
-    await songRepo.updateLastPosition(track.id as string, position);
+    await repos().songRepo.updateLastPosition(track.id as string, position);
   } catch {
     // ignore
   }
@@ -55,10 +61,10 @@ export async function savePositionOnTrackChange(): Promise<void> {
 
 export async function restoreLastSession(): Promise<void> {
   try {
-    const saved = await playerStateRepo.load();
+    const saved = await repos().playerStateRepo.load();
     if (!saved?.currentTrackId) return;
 
-    const song = await songRepo.getById(saved.currentTrackId);
+    const song = await repos().songRepo.getById(saved.currentTrackId);
     if (!song) return;
 
     const queue = await TrackPlayer.getQueue();
