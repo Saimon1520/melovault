@@ -15,8 +15,8 @@ export async function startPositionPersistence(): Promise<void> {
 
   saveIntervalId = setInterval(async () => {
     try {
-      const state = await TrackPlayer.getPlaybackState();
-      if (state.state !== State.Playing) return;
+      const { state } = await TrackPlayer.getPlaybackState();
+      if (state !== State.Playing) return;
 
       const position = await TrackPlayer.getPosition();
       const track = await TrackPlayer.getActiveTrack();
