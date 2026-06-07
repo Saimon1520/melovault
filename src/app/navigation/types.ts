@@ -6,6 +6,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 export type BottomTabParamList = {
   Library: undefined;
   Playlists: undefined;
+  Search: undefined;
   Settings: undefined;
 };
 

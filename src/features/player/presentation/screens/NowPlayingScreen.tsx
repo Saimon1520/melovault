@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  useSharedValue, useAnimatedStyle, withSpring,
   useAnimatedGestureHandler, runOnJS, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,25 +14,34 @@ import { artworkSize } from '@/design-system/tokens/breakpoints';
 import { ProgressSlider } from '../components/ProgressSlider';
 import { PlayerControls } from '../components/PlayerControls';
 import { usePlayerControls } from '../hooks/usePlayerControls';
-import { formatFileSize } from '@/shared/utils/formatTime';
+import { SleepTimerModal } from '../components/SleepTimerModal';
+import { BluetoothModal } from '@/features/bluetooth/presentation/components/BluetoothModal';
+import { EqualizerScreen } from '@/features/settings/presentation/components/EqualizerScreen';
+import { LyricsScreen } from '@/features/lyrics/presentation/screens/LyricsScreen';
+import { VolumeControl } from '../components/VolumeControl';
+import { SpeedControl } from '../components/SpeedControl';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
 interface NowPlayingScreenProps {
   onClose: () => void;
+  songId?: string;
 }
 
-export function NowPlayingScreen({ onClose }: NowPlayingScreenProps) {
+export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { isPlaying } = usePlayerControls();
+
   const [showLyrics, setShowLyrics] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showSleepTimer, setShowSleepTimer] = useState(false);
+  const [showBluetooth, setShowBluetooth] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
 
   const translateY = useSharedValue(0);
   const artworkScale = useSharedValue(isPlaying ? 1 : 0.88);
 
-  // Update artwork scale based on play state
   React.useEffect(() => {
     artworkScale.value = withSpring(isPlaying ? 1 : 0.88, { damping: 20, stiffness: 150 });
   }, [isPlaying]);
@@ -85,8 +94,12 @@ export function NowPlayingScreen({ onClose }: NowPlayingScreenProps) {
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
               REPRODUCIENDO
             </Text>
-            <TouchableOpacity style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Más opciones">
-              <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
+            <TouchableOpacity
+              onPress={() => setShowSleepTimer(v => !v)}
+              style={{ padding: 4 }}
+              accessibilityRole="button" accessibilityLabel="Sleep timer"
+            >
+              <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -124,10 +137,12 @@ export function NowPlayingScreen({ onClose }: NowPlayingScreenProps) {
           </View>
 
           {/* Quick toggles */}
-          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 24, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 24, marginBottom: 8 }}>
             {[
               { key: 'lyrics', label: 'Letras', icon: 'text-outline' as const, active: showLyrics, onPress: () => setShowLyrics(v => !v) },
               { key: 'info', label: 'Info', icon: 'information-circle-outline' as const, active: showInfo, onPress: () => setShowInfo(v => !v) },
+              { key: 'eq', label: 'EQ', icon: 'options-outline' as const, active: false, onPress: () => setShowEqualizer(true) },
+              { key: 'bt', label: 'Bluetooth', icon: 'bluetooth' as const, active: false, onPress: () => setShowBluetooth(true) },
             ].map(({ key, label, icon, active, onPress }) => (
               <TouchableOpacity
                 key={key}
@@ -156,9 +171,15 @@ export function NowPlayingScreen({ onClose }: NowPlayingScreenProps) {
           {/* Controls */}
           <PlayerControls />
 
+          {/* Volume + Speed row */}
+          <View style={{ paddingHorizontal: 24, marginTop: 8, gap: 10 }}>
+            <VolumeControl />
+            <SpeedControl />
+          </View>
+
           {/* Info panel */}
           {showInfo && activeTrack && (
-            <ScrollView style={{ maxHeight: 160, marginHorizontal: 20, marginTop: 8, backgroundColor: palette.surface2, borderRadius: 16 }}>
+            <ScrollView style={{ maxHeight: 140, marginHorizontal: 20, marginTop: 8, backgroundColor: palette.surface2, borderRadius: 16 }}>
               <View style={{ padding: 16 }}>
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 10 }}>
                   INFORMACIÓN
@@ -178,6 +199,22 @@ export function NowPlayingScreen({ onClose }: NowPlayingScreenProps) {
           )}
         </Animated.View>
       </PanGestureHandler>
+
+      {/* Sleep Timer — renders badge + modal */}
+      <SleepTimerModal visible={showSleepTimer} onClose={() => setShowSleepTimer(false)} />
+
+      {/* Bluetooth device picker */}
+      <BluetoothModal visible={showBluetooth} onClose={() => setShowBluetooth(false)} />
+
+      {/* Equalizer full screen modal */}
+      <Modal visible={showEqualizer} animationType="slide" onRequestClose={() => setShowEqualizer(false)}>
+        <EqualizerScreen onClose={() => setShowEqualizer(false)} />
+      </Modal>
+
+      {/* Lyrics full screen modal */}
+      <Modal visible={showLyrics} animationType="slide" onRequestClose={() => setShowLyrics(false)}>
+        <LyricsScreen songId={songId} onClose={() => setShowLyrics(false)} />
+      </Modal>
     </GestureHandlerRootView>
   );
 }

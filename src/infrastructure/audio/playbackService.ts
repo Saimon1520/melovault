@@ -1,4 +1,5 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
+import { savePositionOnTrackChange } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 
 // Runs in a dedicated JS thread for background audio playback.
 // Registered in index.js via TrackPlayer.registerPlaybackService()
@@ -42,9 +43,14 @@ export async function PlaybackService() {
     }
   });
 
+  // ── Save position when track changes ─────────────────────────────────────
+  TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async () => {
+    await savePositionOnTrackChange();
+  });
+
   // ── Track end — advance queue ─────────────────────────────────────────────
   TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
-    // Queue finished — stop playback (repeat mode is handled by RNTP internally)
+    await savePositionOnTrackChange();
     await TrackPlayer.stop();
   });
 }
