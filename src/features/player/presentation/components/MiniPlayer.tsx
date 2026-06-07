@@ -13,11 +13,12 @@ import { palette } from '@/design-system/tokens/colors';
 
 interface MiniPlayerProps {
   onExpand: () => void;
+  onQueueOpen?: () => void;
 }
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
-export function MiniPlayer({ onExpand }: MiniPlayerProps) {
+export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
   const activeTrack = useActiveTrack();
   const { isPlaying, togglePlayPause, skipToNext, skipToPrevious } = usePlayerControls();
   const { position, duration } = usePlayerProgress();
@@ -102,6 +103,16 @@ export function MiniPlayer({ onExpand }: MiniPlayerProps) {
           >
             <Ionicons name="play-skip-forward" size={20} color={palette.textSecondary} />
           </TouchableOpacity>
+          {onQueueOpen && (
+            <TouchableOpacity
+              onPress={onQueueOpen}
+              style={{ width: 32, height: 40, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Ver cola"
+            >
+              <Ionicons name="list" size={18} color={palette.textMuted} />
+            </TouchableOpacity>
+          )}
         </Pressable>
       </Animated.View>
     </PanGestureHandler>

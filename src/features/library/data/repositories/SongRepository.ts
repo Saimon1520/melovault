@@ -75,6 +75,10 @@ export class SongRepository {
       .observe();
   }
 
+  async getById(id: string): Promise<Song | null> {
+    return this.findById(id);
+  }
+
   async findById(id: string): Promise<Song | null> {
     try {
       const m = await this.collection.find(id);
