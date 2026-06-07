@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
   RefreshControl, ActivityIndicator, StatusBar,
@@ -24,10 +24,11 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'genres', label: 'Géneros' },
 ];
 
-const repo = new SongRepository();
 const audioService = TrackPlayerService.getInstance();
 
 export function LibraryPlaceholder() {
+  const repoRef = useRef<SongRepository | null>(null);
+  if (!repoRef.current) repoRef.current = new SongRepository();
   const [activeTab, setActiveTab] = useState<Tab>('songs');
   const [songs, setSongs] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,14 +42,13 @@ export function LibraryPlaceholder() {
 
   const loadSongs = useCallback(async () => {
     setLoading(true);
-    const all = searchQuery.trim()
-      ? await repo.getAll(sortOrder)
-      : await repo.getAll(sortOrder);
-    setSongs(searchQuery.trim()
+    const all = await repoRef.current!.getAll(sortOrder);
+    const q = searchQuery.trim().toLowerCase();
+    setSongs(q
       ? all.filter(s =>
-          s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.album.toLowerCase().includes(searchQuery.toLowerCase()))
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q) ||
+          s.album.toLowerCase().includes(q))
       : all);
     setLoading(false);
   }, [sortOrder, searchQuery]);
@@ -66,7 +66,7 @@ export function LibraryPlaceholder() {
     setQueue(songs, idx);
     setQueueIndex(idx);
     await audioService.setQueue(songs, idx, song.lastPosition);
-    await repo.incrementPlayCount(song.id);
+    await repoRef.current!.incrementPlayCount(song.id);
   }, [songs, setCurrentSong, setQueue, setQueueIndex]);
 
   const isEmpty = !loading && songs.length === 0 && !isScanning;

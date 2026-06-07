@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerControls } from '../hooks/usePlayerControls';
@@ -31,7 +31,7 @@ function ControlButton({
 
   const handlePress = async () => {
     scale.value = withSpring(0.85, { damping: 10, stiffness: 400 });
-    setTimeout(() => { scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }, 100);
+    scale.value = withDelay(100, withSpring(1, { damping: 10, stiffness: 400 }));
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   };

@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android
 
 on:
   push:
@@ -28,14 +28,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 10
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -53,24 +66,29 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build APK (debug)
-        if: github.event.inputs.build_type == 'apk' || github.event_name == 'workflow_dispatch'
+      - name: Build APK
+        if: github.event.inputs.build_type != 'aab'
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
 
-      - name: Build AAB (release)
+      - name: Build AAB
         if: github.event.inputs.build_type == 'aab'
         run: |
           cd android
           ./gradlew bundleRelease --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
 
       - name: Upload APK artifact
-        if: github.event.inputs.build_type == 'apk' || github.event_name == 'push'
+        if: github.event.inputs.build_type != 'aab'
         uses: actions/upload-artifact@v4
         with:
           name: melovault-${{ github.ref_name }}.apk
@@ -89,26 +107,24 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            android/app/build/outputs/apk/release/app-release.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
+          name: MeloVault ${{ github.ref_name }}
           body: |
             ## MeloVault ${{ github.ref_name }}
 
-            ### Descargar
-            | Plataforma | Archivo | Instrucciones |
-            |-----------|---------|--------------|
-            | Android (APK directo) | `melovault-${{ github.ref_name }}.apk` | Descargar e instalar. Habilitar "Fuentes desconocidas" si es necesario |
-            | Android (Google Play) | `.aab` disponible bajo petición | — |
-            | iOS | Build manual requerido (macOS + Xcode) | Ver README |
+            ### Descargar e instalar en Android
+            1. Descarga `app-release.apk` de los archivos de esta release
+            2. En tu celular Android: **Ajustes → Seguridad → Instalar apps desconocidas** → habilitar para tu navegador
+            3. Abre el APK descargado e instala
 
-            ### Instalación en Android
-            1. Descarga el archivo `.apk`
-            2. Abre el archivo en tu dispositivo
-            3. Si aparece advertencia de "fuente desconocida", ve a **Ajustes → Seguridad** y habilita la instalación
-            4. Instala y disfruta 🎵
+            | Plataforma | Archivo | Notas |
+            |---|---|---|
+            | Android 6.0+ (directo) | `app-release.apk` | Descarga e instala directamente |
+            | Android (Play Store) | `.aab` bajo pedido | — |
+            | iOS | Requiere macOS + Xcode | Ver README |
 
-            ### Requisitos
-            - Android 6.0+ (API 23)
-            - Almacenamiento para tu biblioteca musical
+            ### Requisitos mínimos
+            - Android 6.0 (API 23) o superior
+            - ~50 MB espacio en disco
           draft: false
           prerelease: false

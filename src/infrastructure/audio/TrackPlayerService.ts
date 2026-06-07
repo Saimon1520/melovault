@@ -46,7 +46,6 @@ export class TrackPlayerService {
         Capability.SkipToNext,
         Capability.SkipToPrevious,
         Capability.SeekTo,
-        Capability.SetRating,
       ],
 
       // Compact view (3 buttons max in collapsed notification and Quick Settings tile)
