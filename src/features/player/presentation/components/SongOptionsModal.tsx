@@ -64,16 +64,30 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
     );
   };
 
-  const handleDelete = async () => {
-    const result = await FileSystemService.deleteSongFile(song.filePath, song.title);
-    if (result.success) {
-      await songRepo.deleteSongFromDB(song.id);
-      onClose();
-      onSongDeleted?.(song.id);
-    }
+  const handleDelete = () => {
+    Alert.alert(
+      'Eliminar canción permanentemente',
+      `"${song.title}" se eliminará del dispositivo. Esta acción NO se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar', style: 'destructive',
+          onPress: async () => {
+            const result = await FileSystemService.deleteSongFile(song.filePath, song.title);
+            if (result.success) {
+              await songRepo.deleteSongFromDB(song.id);
+              onClose();
+              onSongDeleted?.(song.id);
+            }
+          },
+        },
+      ],
+    );
   };
 
-  const extraFields = song.extraMetadata ? Object.entries(song.extraMetadata) : [];
+  const extraFields = song.extraMetadata
+    ? Object.entries(song.extraMetadata).filter(([, v]) => v && v.trim() !== '')
+    : [];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>

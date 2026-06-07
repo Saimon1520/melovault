@@ -21,6 +21,7 @@ import { LyricsScreen } from '@/features/lyrics/presentation/screens/LyricsScree
 import { SongOptionsModal } from '../components/SongOptionsModal';
 import { VolumeControl } from '../components/VolumeControl';
 import { SpeedControl } from '../components/SpeedControl';
+import { usePlayerStore } from '../store/playerStore';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
@@ -33,6 +34,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { isPlaying } = usePlayerControls();
+  const { currentSong } = usePlayerStore();
 
   const [showLyrics, setShowLyrics] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -228,24 +230,11 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
       </Modal>
 
       {/* Song options modal (via "…" button) */}
-      {activeTrack && (
-        <SongOptionsModal
-          song={activeTrack.id ? {
-            id: String(activeTrack.id),
-            title: activeTrack.title ?? '',
-            artist: activeTrack.artist ?? '',
-            album: activeTrack.album ?? '',
-            filePath: String(activeTrack.url ?? ''),
-            artworkPath: activeTrack.artwork ? String(activeTrack.artwork) : undefined,
-            duration: (activeTrack.duration ?? 0) * 1000,
-            isHidden: false,
-            playCount: 0,
-            lastPosition: 0,
-          } as any : null}
-          visible={showOptions}
-          onClose={() => setShowOptions(false)}
-        />
-      )}
+      <SongOptionsModal
+        song={currentSong}
+        visible={showOptions}
+        onClose={() => setShowOptions(false)}
+      />
     </GestureHandlerRootView>
   );
 }
