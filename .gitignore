@@ -54,3 +54,7 @@ ios/build/
 *.apk
 *.ipa
 *.aab
+
+# Local device notes (personal info — never commit)
+*.local.md
+.device.local.*
