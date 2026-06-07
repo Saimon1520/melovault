@@ -21,7 +21,7 @@ import { LyricsScreen } from '@/features/lyrics/presentation/screens/LyricsScree
 import { SongOptionsModal } from '../components/SongOptionsModal';
 import { VolumeControl } from '../components/VolumeControl';
 import { SpeedControl } from '../components/SpeedControl';
-import { usePlayerStore } from '../store/playerStore';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
