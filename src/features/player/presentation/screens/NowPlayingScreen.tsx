@@ -18,6 +18,7 @@ import { SleepTimerModal } from '../components/SleepTimerModal';
 import { BluetoothModal } from '@/features/bluetooth/presentation/components/BluetoothModal';
 import { EqualizerScreen } from '@/features/settings/presentation/components/EqualizerScreen';
 import { LyricsScreen } from '@/features/lyrics/presentation/screens/LyricsScreen';
+import { SongOptionsModal } from '../components/SongOptionsModal';
 import { VolumeControl } from '../components/VolumeControl';
 import { SpeedControl } from '../components/SpeedControl';
 
@@ -38,6 +39,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   const [showSleepTimer, setShowSleepTimer] = useState(false);
   const [showBluetooth, setShowBluetooth] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   const translateY = useSharedValue(0);
   const artworkScale = useSharedValue(isPlaying ? 1 : 0.88);
@@ -94,13 +96,22 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
               REPRODUCIENDO
             </Text>
-            <TouchableOpacity
-              onPress={() => setShowSleepTimer(v => !v)}
-              style={{ padding: 4 }}
-              accessibilityRole="button" accessibilityLabel="Sleep timer"
-            >
-              <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <TouchableOpacity
+                onPress={() => setShowSleepTimer(v => !v)}
+                style={{ padding: 4 }}
+                accessibilityRole="button" accessibilityLabel="Sleep timer"
+              >
+                <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowOptions(true)}
+                style={{ padding: 4 }}
+                accessibilityRole="button" accessibilityLabel="Más opciones"
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Artwork */}
@@ -215,6 +226,26 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
       <Modal visible={showLyrics} animationType="slide" onRequestClose={() => setShowLyrics(false)}>
         <LyricsScreen songId={songId} onClose={() => setShowLyrics(false)} />
       </Modal>
+
+      {/* Song options modal (via "…" button) */}
+      {activeTrack && (
+        <SongOptionsModal
+          song={activeTrack.id ? {
+            id: String(activeTrack.id),
+            title: activeTrack.title ?? '',
+            artist: activeTrack.artist ?? '',
+            album: activeTrack.album ?? '',
+            filePath: String(activeTrack.url ?? ''),
+            artworkPath: activeTrack.artwork ? String(activeTrack.artwork) : undefined,
+            duration: (activeTrack.duration ?? 0) * 1000,
+            isHidden: false,
+            playCount: 0,
+            lastPosition: 0,
+          } as any : null}
+          visible={showOptions}
+          onClose={() => setShowOptions(false)}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { palette } from '@/design-system/tokens/colors';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
+import { SongOptionsModal } from '@/features/player/presentation/components/SongOptionsModal';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { useLibraryScan } from '../hooks/useLibrary';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
@@ -33,6 +34,7 @@ export function LibraryPlaceholder() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('title');
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const { isScanning, scanProgress, startScan } = useLibraryScan();
   const activeTrack = useActiveTrack();
   const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
@@ -180,6 +182,7 @@ export function LibraryPlaceholder() {
               song={item}
               isPlaying={activeTrack?.id === item.id}
               onPress={handleSongPress}
+              onLongPress={setSelectedSong}
             />
           )}
           refreshControl={
@@ -196,6 +199,21 @@ export function LibraryPlaceholder() {
           contentContainerStyle={{ paddingBottom: 120 }}
         />
       )}
+
+      {/* Song options modal (long press) */}
+      <SongOptionsModal
+        song={selectedSong}
+        visible={selectedSong !== null}
+        onClose={() => setSelectedSong(null)}
+        onSongDeleted={(id) => {
+          setSongs(prev => prev.filter(s => s.id !== id));
+          setSelectedSong(null);
+        }}
+        onSongHidden={(id) => {
+          setSongs(prev => prev.filter(s => s.id !== id));
+          setSelectedSong(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
