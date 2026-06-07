@@ -12,7 +12,7 @@ import { SettingsModel } from './models/SettingsModel';
 const adapter = new SQLiteAdapter({
   schema: dbSchema,
   migrations,
-  jsi: true, // Use JSI for better performance (requires bare workflow)
+  jsi: false,
   onSetUpError: (error) => {
     console.error('[Database] Setup failed:', error);
   },
