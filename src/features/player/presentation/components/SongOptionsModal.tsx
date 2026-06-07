@@ -6,6 +6,7 @@ import { palette } from '@/design-system/tokens/colors';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { FileSystemService } from '@/infrastructure/filesystem/FileSystemService';
+import { ArtworkPicker } from '@/features/library/presentation/components/ArtworkPicker';
 import type { Song, Playlist } from '@/shared/types';
 import { formatTime, formatFileSize } from '@/shared/utils/formatTime';
 
@@ -24,15 +25,19 @@ interface SongOptionsModalProps {
 export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSongHidden }: SongOptionsModalProps) {
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showArtworkPicker, setShowArtworkPicker] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [currentSong, setCurrentSong] = useState<Song | null>(song);
 
   useEffect(() => {
     if (visible) {
       playlistRepo.getAll().then(setPlaylists);
       setShowPlaylists(false);
       setShowInfo(false);
+      setShowArtworkPicker(false);
+      setCurrentSong(song);
     }
-  }, [visible]);
+  }, [visible, song]);
 
   if (!song) return null;
 
@@ -92,6 +97,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
           {/* Main actions */}
           {[
             { icon: 'list-outline' as const, label: 'Agregar a playlist', onPress: () => setShowPlaylists(v => !v) },
+            { icon: 'image-outline' as const, label: 'Cambiar portada', onPress: () => setShowArtworkPicker(true) },
             { icon: 'information-circle-outline' as const, label: 'Ver información', onPress: () => setShowInfo(v => !v) },
             { icon: 'eye-off-outline' as const, label: 'Ocultar canción', onPress: handleHide, color: palette.warning },
             { icon: 'trash-outline' as const, label: 'Eliminar del dispositivo', onPress: handleDelete, color: palette.error },
@@ -158,6 +164,16 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
           )}
         </ScrollView>
       </View>
+
+      {/* Artwork picker nested modal */}
+      {currentSong && (
+        <ArtworkPicker
+          song={currentSong}
+          visible={showArtworkPicker}
+          onClose={() => setShowArtworkPicker(false)}
+          onArtworkUpdated={(path) => setCurrentSong(prev => prev ? { ...prev, artworkPath: path } : prev)}
+        />
+      )}
     </Modal>
   );
 }
