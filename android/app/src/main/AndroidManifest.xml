@@ -1,17 +1,38 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:tools="http://schemas.android.com/tools">
 
+  <!-- Network -->
   <uses-permission android:name="android.permission.INTERNET"/>
-  <!-- OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED -->
+
+  <!-- UI -->
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
-  <!-- These require runtime permissions on M -->
+
+  <!-- Storage — legacy (Android ≤ 12) -->
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
-  <!-- END OPTIONAL PERMISSIONS -->
+
+  <!-- Storage — Android 13+ granular media permissions -->
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+
+  <!-- Background audio playback (required for Android 9+) -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <!-- Required for Android 14+ foreground service with media type -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+
+  <!-- Wake lock — keeps CPU awake during background playback -->
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+  <!-- Auto-restart playback after device reboot -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+  <!-- Bluetooth audio output -->
+  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
 
   <queries>
-    <!-- Support checking for http(s) links via the Linking API -->
     <intent>
       <action android:name="android.intent.action.VIEW" />
       <category android:name="android.intent.category.BROWSABLE" />
@@ -19,12 +40,47 @@
     </intent>
   </queries>
 
-  <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true">
-    <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true">
+  <application
+    android:name=".MainApplication"
+    android:label="@string/app_name"
+    android:icon="@mipmap/ic_launcher"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:allowBackup="false"
+    android:theme="@style/AppTheme"
+    android:supportsRtl="true">
+
+    <activity
+      android:name=".MainActivity"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize"
+      android:launchMode="singleTask"
+      android:windowSoftInputMode="adjustResize"
+      android:theme="@style/Theme.App.SplashScreen"
+      android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
+
+    <!-- react-native-track-player: background audio service
+         foregroundServiceType="mediaPlayback" required for Android 14+ -->
+    <service
+      android:name="com.doublesymmetry.trackplayer.service.HeadlessJsMediaService"
+      android:foregroundServiceType="mediaPlayback"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="androidx.media3.session.MediaSessionService"/>
+      </intent-filter>
+    </service>
+
+    <!-- Auto-restart after reboot -->
+    <receiver
+      android:name="com.doublesymmetry.trackplayer.receivers.MusicControllerBroadcastReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+      </intent-filter>
+    </receiver>
+
   </application>
 </manifest>

@@ -1,0 +1,114 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - aab
+
+jobs:
+  build:
+    name: Build Android ${{ github.event.inputs.build_type || 'apk' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APK (debug)
+        if: github.event.inputs.build_type == 'apk' || github.event_name == 'workflow_dispatch'
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Build AAB (release)
+        if: github.event.inputs.build_type == 'aab'
+        run: |
+          cd android
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Upload APK artifact
+        if: github.event.inputs.build_type == 'apk' || github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: melovault-${{ github.ref_name }}.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Upload AAB artifact
+        if: github.event.inputs.build_type == 'aab'
+        uses: actions/upload-artifact@v4
+        with:
+          name: melovault-${{ github.ref_name }}.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+          body: |
+            ## MeloVault ${{ github.ref_name }}
+
+            ### Descargar
+            | Plataforma | Archivo | Instrucciones |
+            |-----------|---------|--------------|
+            | Android (APK directo) | `melovault-${{ github.ref_name }}.apk` | Descargar e instalar. Habilitar "Fuentes desconocidas" si es necesario |
+            | Android (Google Play) | `.aab` disponible bajo petición | — |
+            | iOS | Build manual requerido (macOS + Xcode) | Ver README |
+
+            ### Instalación en Android
+            1. Descarga el archivo `.apk`
+            2. Abre el archivo en tu dispositivo
+            3. Si aparece advertencia de "fuente desconocida", ve a **Ajustes → Seguridad** y habilita la instalación
+            4. Instala y disfruta 🎵
+
+            ### Requisitos
+            - Android 6.0+ (API 23)
+            - Almacenamiento para tu biblioteca musical
+          draft: false
+          prerelease: false
