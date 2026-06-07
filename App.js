@@ -2,11 +2,14 @@ import './global.css';
 import React from 'react';
 import { Providers } from './src/app/Providers';
 import { RootNavigator } from './src/app/navigation/RootNavigator';
+import { ErrorBoundary } from './src/app/ErrorBoundary';
 
 export default function App() {
   return (
-    <Providers>
-      <RootNavigator />
-    </Providers>
+    <ErrorBoundary>
+      <Providers>
+        <RootNavigator />
+      </Providers>
+    </ErrorBoundary>
   );
 }
