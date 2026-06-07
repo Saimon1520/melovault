@@ -34,3 +34,23 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# pnpm
+.pnpm-debug.log*
+
+# environment
+.env
+.env.local
+
+# Android local signing
+android/app/release/
+android/keystores/
+
+# iOS
+ios/Pods/
+ios/build/
+
+# Build artifacts
+*.apk
+*.ipa
+*.aab
