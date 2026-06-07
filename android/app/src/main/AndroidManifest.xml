@@ -62,25 +62,9 @@
       </intent-filter>
     </activity>
 
-    <!-- react-native-track-player: background audio service
-         foregroundServiceType="mediaPlayback" required for Android 14+ -->
-    <service
-      android:name="com.doublesymmetry.trackplayer.service.HeadlessJsMediaService"
-      android:foregroundServiceType="mediaPlayback"
-      android:exported="false">
-      <intent-filter>
-        <action android:name="androidx.media3.session.MediaSessionService"/>
-      </intent-filter>
-    </service>
-
-    <!-- Auto-restart after reboot -->
-    <receiver
-      android:name="com.doublesymmetry.trackplayer.receivers.MusicControllerBroadcastReceiver"
-      android:exported="false">
-      <intent-filter>
-        <action android:name="android.intent.action.BOOT_COMPLETED"/>
-      </intent-filter>
-    </receiver>
+    <!-- react-native-track-player v4: MusicService is declared by the library's
+         own manifest and merged automatically — no duplicate declaration needed.
+         Adding a wrong class name here causes ClassNotFoundException on launch. -->
 
   </application>
 </manifest>
