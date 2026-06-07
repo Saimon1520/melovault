@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
-import { useSettingsStore } from '../store/settingsStore';
+import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { SEEK_SECONDS_OPTIONS } from '@/shared/constants/audioFormats';
 import type { PlaybackSpeed } from '@/shared/types';
 

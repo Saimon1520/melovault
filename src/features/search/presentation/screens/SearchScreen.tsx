@@ -13,6 +13,8 @@ import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import type { Song } from '@/shared/types';
 import { useActiveTrack } from 'react-native-track-player';
 
+const audioService = TrackPlayerService.getInstance();
+
 const songRepo = new SongRepository();
 
 export function SearchScreen() {
@@ -45,8 +47,9 @@ export function SearchScreen() {
   };
 
   const playSong = useCallback(async (song: Song) => {
-    await TrackPlayerService.playFromLibrary([song], 0, song.lastPosition);
-  }, []);
+    const index = results.findIndex(s => s.id === song.id);
+    await audioService.setQueue(results.length > 0 ? results : [song], index >= 0 ? index : 0, song.lastPosition);
+  }, [results]);
 
   const clearSearch = () => {
     setQuery('');

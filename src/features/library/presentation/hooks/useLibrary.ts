@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useLibraryStore } from '../store/libraryStore';
+import { useLibraryStore } from '../../store/libraryStore';
 import { ScanLibraryUseCase } from '../../domain/usecases/ScanLibraryUseCase';
 
 const scanUseCase = new ScanLibraryUseCase();

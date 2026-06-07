@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { palette } from '@/design-system/tokens/colors';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
-import { SongRepository } from '../repositories/SongRepository';
+import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { useLibraryScan } from '../hooks/useLibrary';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
