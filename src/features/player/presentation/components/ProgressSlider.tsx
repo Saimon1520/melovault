@@ -1,0 +1,105 @@
+import React from 'react';
+import { View, Text } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import TrackPlayer from 'react-native-track-player';
+import { usePlayerProgress } from '../hooks/usePlayerControls';
+import { formatTime } from '@/shared/utils/formatTime';
+import { palette } from '@/design-system/tokens/colors';
+
+export function ProgressSlider() {
+  const { position, duration } = usePlayerProgress();
+  const sliderWidth = useSharedValue(0);
+  const thumbScale = useSharedValue(1);
+  const isSeeking = useSharedValue(false);
+  const seekProgress = useSharedValue(0);
+
+  const progress = duration > 0 ? position / duration : 0;
+
+  const seekTo = async (pos: number) => {
+    await TrackPlayer.seekTo(pos * duration);
+  };
+
+  const pan = Gesture.Pan()
+    .onBegin(() => {
+      thumbScale.value = withSpring(1.5, { damping: 15, stiffness: 300 });
+      isSeeking.value = true;
+      seekProgress.value = progress;
+    })
+    .onUpdate((e) => {
+      seekProgress.value = Math.max(0, Math.min(1, e.x / sliderWidth.value));
+    })
+    .onEnd(() => {
+      thumbScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+      runOnJS(seekTo)(seekProgress.value);
+      isSeeking.value = false;
+    });
+
+  const tap = Gesture.Tap().onEnd((e) => {
+    const pos = Math.max(0, Math.min(1, e.x / sliderWidth.value));
+    runOnJS(seekTo)(pos);
+  });
+
+  const combined = Gesture.Race(pan, tap);
+
+  const displayProgress = isSeeking.value ? seekProgress.value : progress;
+
+  const barStyle = useAnimatedStyle(() => ({
+    width: `${(isSeeking.value ? seekProgress.value : progress) * 100}%`,
+  }));
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: thumbScale.value }],
+    left: `${(isSeeking.value ? seekProgress.value : progress) * 100}%`,
+    marginLeft: -8,
+  }));
+
+  return (
+    <View style={{ paddingHorizontal: 24, marginTop: 12 }}>
+      <GestureDetector gesture={combined}>
+        <View
+          style={{ height: 40, justifyContent: 'center' }}
+          onLayout={(e) => { sliderWidth.value = e.nativeEvent.layout.width; }}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={`Progreso: ${formatTime(position * 1000)} de ${formatTime(duration * 1000)}`}
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
+        >
+          {/* Track background */}
+          <View style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'visible' }}>
+            {/* Filled portion */}
+            <Animated.View style={[barStyle, {
+              height: '100%',
+              backgroundColor: palette.accent,
+              borderRadius: 2,
+            }]} />
+          </View>
+          {/* Thumb */}
+          <Animated.View style={[thumbStyle, {
+            position: 'absolute',
+            width: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: '#fff',
+            shadowColor: palette.accent,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.9,
+            shadowRadius: 6,
+            elevation: 4,
+          }]} />
+        </View>
+      </GestureDetector>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+          {formatTime(position * 1000)}
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+          {formatTime(duration * 1000)}
+        </Text>
+      </View>
+    </View>
+  );
+}
