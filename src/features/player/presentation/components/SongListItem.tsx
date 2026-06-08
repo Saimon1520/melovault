@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { formatTime } from '@/shared/utils/formatTime';
@@ -32,8 +32,8 @@ export const SongListItem = memo(function SongListItem({
     >
       {/* Artwork */}
       <View style={{ position: 'relative' }}>
-        <FastImage
-          source={song.artworkPath ? { uri: song.artworkPath, cache: FastImage.cacheControl.immutable } : DEFAULT_ARTWORK}
+        <ExpoImage
+          source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
           style={{ width: 48, height: 48, borderRadius: 8 }}
         />
         {isPlaying && (

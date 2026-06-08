@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Modal, Alert } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import TrackPlayer, { Track, useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { palette } from '@/design-system/tokens/colors';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -122,7 +122,7 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
                   accessibilityRole="button"
                   accessibilityLabel={`${item.title ?? 'Sin título'} por ${item.artist ?? 'Desconocido'}${isCurrent ? ', reproduciendo ahora' : ''}`}
                 >
-                  <FastImage
+                  <ExpoImage
                     source={item.artwork ? { uri: String(item.artwork) } : DEFAULT_ARTWORK}
                     style={{ width: 44, height: 44, borderRadius: 8, marginRight: 12 }}
                   />

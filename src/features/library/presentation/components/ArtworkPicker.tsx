@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert, Modal } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
@@ -73,7 +73,7 @@ export function ArtworkPicker({ song, visible, onClose, onArtworkUpdated }: Artw
 
           {/* Current artwork preview */}
           <View style={{ alignItems: 'center', marginBottom: 24 }}>
-            <FastImage
+            <ExpoImage
               source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
               style={{ width: 120, height: 120, borderRadius: 16 }}
             />

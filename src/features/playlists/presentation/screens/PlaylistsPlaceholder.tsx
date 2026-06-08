@@ -4,7 +4,7 @@ import {
   Switch, FlatList, Alert, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
@@ -121,7 +121,7 @@ function PlaylistCard({ playlist, onPress, onEdit, onDelete }: {
       accessibilityRole="button"
       accessibilityLabel={`Playlist ${playlist.name}, ${playlist.songCount ?? 0} canciones`}
     >
-      <FastImage
+      <ExpoImage
         source={playlist.artworkPath ? { uri: playlist.artworkPath } : DEFAULT_ARTWORK}
         style={{ width: 56, height: 56, borderRadius: 10 }}
       />

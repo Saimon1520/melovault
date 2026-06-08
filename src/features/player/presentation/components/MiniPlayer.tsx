@@ -5,7 +5,7 @@ import Animated, {
   withTiming, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { usePlayerControls, usePlayerProgress } from '../hooks/usePlayerControls';
@@ -74,7 +74,7 @@ export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
           accessibilityRole="button"
           accessibilityLabel={`Abrir reproductor. ${activeTrack.title} por ${activeTrack.artist}`}
         >
-          <FastImage
+          <ExpoImage
             source={activeTrack.artwork ? { uri: activeTrack.artwork } : DEFAULT_ARTWORK}
             style={{ width: 44, height: 44, borderRadius: 8 }}
           />

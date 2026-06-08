@@ -5,7 +5,7 @@ import Animated, {
   runOnJS, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -125,8 +125,8 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
               shadowRadius: 30,
               elevation: 20,
             }]}>
-              <FastImage
-                source={activeTrack?.artwork ? { uri: activeTrack.artwork, cache: FastImage.cacheControl.immutable } : DEFAULT_ARTWORK}
+              <ExpoImage
+                source={activeTrack?.artwork ? { uri: activeTrack.artwork } : DEFAULT_ARTWORK}
                 style={{ width: size, height: size, borderRadius: 20 }}
                 accessibilityLabel={`Portada de ${activeTrack?.album ?? 'álbum desconocido'}`}
               />
