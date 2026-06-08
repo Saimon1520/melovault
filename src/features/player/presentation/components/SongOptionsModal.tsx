@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import FastImage from 'react-native-fast-image';
+import { Image as ExpoImage } from 'expo-image';
 import { palette } from '@/design-system/tokens/colors';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
@@ -94,7 +94,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
       <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
         {/* Song header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 28, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
-          <FastImage
+          <ExpoImage
             source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
             style={{ width: 52, height: 52, borderRadius: 10 }}
           />
