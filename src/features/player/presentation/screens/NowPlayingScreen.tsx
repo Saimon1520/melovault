@@ -92,9 +92,9 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
           flex: 1,
           backgroundColor: palette.surface0,
           paddingTop: insets.top,
-          // Respect side cutouts / nav bar when the phone is folded or rotated.
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
+          // Symmetric side padding (max of both insets) clears the camera cutout
+          // / nav bar when folded or rotated AND keeps the artwork screen-centered.
+          paddingHorizontal: Math.max(insets.left, insets.right),
           // Guard against devices that under-report the bottom inset so the
           // speed row never sits under the system navigation bar.
           paddingBottom: Math.max(insets.bottom, 24) + 12,
@@ -227,7 +227,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
       {/* Info modal (full metadata) */}
       <Modal visible={showInfo} animationType="fade" transparent onRequestClose={() => setShowInfo(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '75%' }}>
+          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '75%' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>Información</Text>
               <TouchableOpacity onPress={() => setShowInfo(false)} style={{ padding: 4 }}>

@@ -65,7 +65,7 @@ export function SearchScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: palette.surface0 }}
+      style={{ flex: 1, backgroundColor: palette.surface0, paddingLeft: insets.left, paddingRight: insets.right }}
     >
       {/* Search bar */}
       <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: palette.surface1 }}>

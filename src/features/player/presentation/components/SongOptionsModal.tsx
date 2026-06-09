@@ -8,6 +8,7 @@ import { PlaylistRepository } from '@/features/playlists/data/repositories/Playl
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { FileSystemService } from '@/infrastructure/filesystem/FileSystemService';
 import { ArtworkPicker } from '@/features/library/presentation/components/ArtworkPicker';
+import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { usePositionMemoryStore } from '@/features/player/store/positionMemoryStore';
 import { useArchiveStore } from '@/features/library/store/archiveStore';
 import type { Song, Playlist } from '@/shared/types';
@@ -107,6 +108,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
+       <ResponsivePane>
         {/* Song header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 28, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
           <ExpoImage
@@ -218,6 +220,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
             </View>
           )}
         </ScrollView>
+       </ResponsivePane>
       </View>
 
       {/* Artwork picker nested modal */}

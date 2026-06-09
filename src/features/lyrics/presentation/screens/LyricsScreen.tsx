@@ -6,6 +6,7 @@ import {
 import { useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
+import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { LRCLibService } from '@/infrastructure/lyrics/LRCLibService';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { usePlayerProgress } from '@/features/player/presentation/hooks/usePlayerControls';
@@ -88,6 +89,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: palette.surface0 }}
     >
+      <ResponsivePane maxWidth={680}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 20 }}>
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar letras">
@@ -192,6 +194,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
           </View>
         </View>
       )}
+      </ResponsivePane>
     </KeyboardAvoidingView>
   );
 }

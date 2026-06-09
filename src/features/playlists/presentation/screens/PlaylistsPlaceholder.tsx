@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { PlaylistDetailScreen } from './PlaylistDetailScreen';
+import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import type { Playlist } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -49,6 +50,7 @@ function PlaylistFormModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: palette.surface0, padding: 24, paddingTop: 40 }}>
+        <ResponsivePane maxWidth={560} style={{ flex: 0 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <Text style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}>
             {existing ? 'Editar playlist' : 'Nueva playlist'}
@@ -103,6 +105,7 @@ function PlaylistFormModal({
             {existing ? 'Guardar cambios' : 'Crear playlist'}
           </Text>
         </TouchableOpacity>
+        </ResponsivePane>
       </View>
     </Modal>
   );

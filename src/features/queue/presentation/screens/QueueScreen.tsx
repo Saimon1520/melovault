@@ -82,7 +82,7 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', paddingBottom: 24 }}>
+        <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', height: '80%', paddingBottom: 24 }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20 }}>
             <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>
