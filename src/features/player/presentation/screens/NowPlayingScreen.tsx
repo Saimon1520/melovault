@@ -115,7 +115,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
               <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
             </TouchableOpacity>
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
-              REPRODUCIENDO
+              {isPlaying ? 'REPRODUCIENDO' : 'EN PAUSA'}
             </Text>
             <View style={{ flexDirection: 'row', gap: 4 }}>
               <TouchableOpacity
