@@ -1,8 +1,62 @@
-import * as MediaLibrary from 'expo-media-library';
+import { NativeModules, Platform } from 'react-native';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import * as FileSystem from 'expo-file-system';
 import type { Song } from '@/shared/types';
-import { MetadataExtractor } from '@/infrastructure/metadata/MetadataExtractor';
 import { SUPPORTED_AUDIO_FORMATS } from '@/shared/constants/audioFormats';
+
+// Native MediaStore-backed tag reader (Android). Returns, keyed by MediaStore
+// id: { filePath, fileSize, title, artist, album, albumArtist, composer,
+// genre, year, trackNumber, duration, bitRate }. Falls back gracefully when
+// unavailable (e.g. iOS).
+interface NativeAudioMeta {
+  filePath?: string;
+  fileSize?: number;
+  title?: string;
+  artist?: string;
+  album?: string;
+  albumArtist?: string;
+  composer?: string;
+  genre?: string;
+  year?: string;
+  trackNumber?: number;
+  duration?: number;
+  bitRate?: number;
+}
+const AudioMetadata: {
+  getByIds(ids: string[]): Promise<Record<string, NativeAudioMeta>>;
+  extractArtwork(ids: string[]): Promise<Record<string, string>>;
+} | undefined = NativeModules.AudioMetadata;
+
+async function fetchNativeArtwork(ids: string[]): Promise<Record<string, string>> {
+  if (Platform.OS !== 'android' || !AudioMetadata?.extractArtwork || ids.length === 0) return {};
+  const out: Record<string, string> = {};
+  const CHUNK = 60; // image decoding is heavier than a metadata query
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    try {
+      const part = await AudioMetadata.extractArtwork(ids.slice(i, i + CHUNK));
+      Object.assign(out, part);
+    } catch {
+      // Ignore — these songs fall back to the default artwork.
+    }
+  }
+  return out;
+}
+
+async function fetchNativeMetadata(ids: string[]): Promise<Record<string, NativeAudioMeta>> {
+  if (Platform.OS !== 'android' || !AudioMetadata?.getByIds || ids.length === 0) return {};
+  const out: Record<string, NativeAudioMeta> = {};
+  // SQLite limits the number of bound variables (~999), so query in chunks.
+  const CHUNK = 400;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    try {
+      const part = await AudioMetadata.getByIds(ids.slice(i, i + CHUNK));
+      Object.assign(out, part);
+    } catch {
+      // Ignore — fall back to filename-derived data for this chunk.
+    }
+  }
+  return out;
+}
 
 export interface ScanProgress {
   scanned: number;
@@ -40,6 +94,12 @@ export class MediaScanner {
       after = page.endCursor;
     }
 
+    // Batch-read real tag metadata (artist/album/title/…) from MediaStore,
+    // plus extract & cache embedded cover art.
+    const ids = allAssets.map(a => a.id);
+    const meta = await fetchNativeMetadata(ids);
+    const artwork = await fetchNativeArtwork(ids);
+
     const songs: Partial<Song>[] = [];
     const total = allAssets.length;
 
@@ -58,17 +118,33 @@ export class MediaScanner {
       const extension = asset.filename.split('.').pop()?.toLowerCase() ?? '';
       if (!SUPPORTED_AUDIO_FORMATS.includes(extension as any)) continue;
 
-      const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-      const filePath = assetInfo.localUri ?? asset.uri;
+      const m = meta[asset.id] ?? {};
+      // Prefer the real filesystem path from MediaStore; fall back to a
+      // (slower) per-asset lookup only when the native module didn't supply it.
+      let filePath = m.filePath;
+      if (!filePath) {
+        const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
+        filePath = assetInfo.localUri ?? asset.uri;
+      }
 
       songs.push({
         id: asset.id,
         filePath,
-        title: this.cleanTitle(asset.filename),
-        duration: Math.round(asset.duration * 1000), // convert to ms
+        title: m.title || this.cleanTitle(asset.filename),
+        artist: m.artist,
+        album: m.album,
+        albumArtist: m.albumArtist,
+        composer: m.composer,
+        genre: m.genre,
+        year: m.year,
+        trackNumber: m.trackNumber,
+        bitRate: m.bitRate,
+        fileSize: m.fileSize ?? 0,
+        duration: m.duration ?? Math.round(asset.duration * 1000), // ms
+        artworkPath: artwork[asset.id],
+        artworkEmbedded: artwork[asset.id] != null,
         createdAt: asset.creationTime,
         updatedAt: asset.modificationTime,
-        artworkEmbedded: false,
         isHidden: false,
         playCount: 0,
         lastPosition: 0,

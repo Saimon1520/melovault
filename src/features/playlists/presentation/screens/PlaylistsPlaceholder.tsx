@@ -8,6 +8,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
+import { PlaylistDetailScreen } from './PlaylistDetailScreen';
 import type { Playlist } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -164,6 +165,7 @@ export function PlaylistsPlaceholder() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | undefined>();
+  const [openPlaylist, setOpenPlaylist] = useState<Playlist | null>(null);
 
   const loadPlaylists = useCallback(async () => {
     setPlaylists(await repo.getAll());
@@ -216,7 +218,7 @@ export function PlaylistsPlaceholder() {
           renderItem={({ item }) => (
             <PlaylistCard
               playlist={item}
-              onPress={() => {}}
+              onPress={() => setOpenPlaylist(item)}
               onEdit={() => { setEditingPlaylist(item); setShowForm(true); }}
               onDelete={() => handleDelete(item)}
             />
@@ -231,6 +233,13 @@ export function PlaylistsPlaceholder() {
         existing={editingPlaylist}
         onClose={() => setShowForm(false)}
         onSave={loadPlaylists}
+      />
+
+      <PlaylistDetailScreen
+        playlist={openPlaylist}
+        visible={openPlaylist !== null}
+        onClose={() => setOpenPlaylist(null)}
+        onChanged={loadPlaylists}
       />
     </SafeAreaView>
   );

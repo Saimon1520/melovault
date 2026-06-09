@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Modal, FlatList, ActivityIndicator, NativeModules } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
+
+type DeviceType = 'bluetooth' | 'wired' | 'usb' | 'speaker';
 
 interface AudioDevice {
   id: string;
   name: string;
-  type: 'bluetooth' | 'speaker' | 'headphones' | 'earpiece';
+  type: DeviceType;
   isSelected: boolean;
 }
 
@@ -15,38 +17,52 @@ interface BluetoothModalProps {
   onClose: () => void;
 }
 
-// Note: Full BT device switching requires a native module (react-native-track-player
-// exposes output routing on newer versions). This component provides the UI shell
-// and hooks into the available native audio session API.
+const AudioControl: {
+  getOutputDevices(): Promise<{ id: number; name: string; type: DeviceType; bluetooth: boolean }[]>;
+  openBluetoothSettings(): void;
+} | undefined = NativeModules.AudioControl;
+
+// Android routes media to the highest-priority connected output automatically
+// (Bluetooth > USB > wired > speaker), so we surface the real device list from
+// AudioManager and mark which one is currently active.
+const PRIORITY: DeviceType[] = ['bluetooth', 'usb', 'wired', 'speaker'];
+
 export function BluetoothModal({ visible, onClose }: BluetoothModalProps) {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const loadDevices = useCallback(async () => {
+    setLoading(true);
+    try {
+      const native = (await AudioControl?.getOutputDevices()) ?? [];
+      const list: AudioDevice[] = native.length
+        ? native.map(d => ({ id: String(d.id), name: d.name, type: d.type, isSelected: false }))
+        : [{ id: 'speaker', name: 'Altavoz del teléfono', type: 'speaker', isSelected: true }];
+
+      // Mark the active output (highest-priority connected device).
+      const active = PRIORITY.find(t => list.some(d => d.type === t));
+      let marked = false;
+      for (const d of list) {
+        d.isSelected = !marked && d.type === active;
+        if (d.isSelected) marked = true;
+      }
+      setDevices(list);
+    } catch {
+      setDevices([{ id: 'speaker', name: 'Altavoz del teléfono', type: 'speaker', isSelected: true }]);
+    }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (visible) loadDevices();
-  }, [visible]);
+  }, [visible, loadDevices]);
 
-  const loadDevices = async () => {
-    setLoading(true);
-    // Default system devices always available
-    const systemDevices: AudioDevice[] = [
-      { id: 'speaker', name: 'Altavoz del teléfono', type: 'speaker', isSelected: true },
-      { id: 'earpiece', name: 'Auricular (llamada)', type: 'earpiece', isSelected: false },
-    ];
-
-    // On Android, we can query AudioManager for connected BT devices
-    // This is handled natively by react-native-track-player on newer versions
-    // For now, show system devices + instruction to connect via system settings
-    setDevices(systemDevices);
-    setLoading(false);
-  };
-
-  const typeIcon = (type: AudioDevice['type']): React.ComponentProps<typeof Ionicons>['name'] => {
+  const typeIcon = (type: DeviceType): React.ComponentProps<typeof Ionicons>['name'] => {
     switch (type) {
       case 'bluetooth': return 'bluetooth';
-      case 'headphones': return 'headset';
-      case 'speaker': return 'volume-high';
-      default: return 'call';
+      case 'wired': return 'headset';
+      case 'usb': return 'hardware-chip';
+      default: return 'volume-high';
     }
   };
 
@@ -88,12 +104,22 @@ export function BluetoothModal({ visible, onClose }: BluetoothModalProps) {
                 )}
               />
 
-              <View style={{ marginTop: 16, padding: 14, backgroundColor: palette.surface2, borderRadius: 12 }}>
-                <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20 }}>
-                  💡 Para conectar dispositivos Bluetooth, hazlo desde los ajustes de tu sistema.
-                  Una vez conectado, aparecerá aquí automáticamente.
+              <TouchableOpacity
+                onPress={() => AudioControl?.openBluetoothSettings()}
+                style={{ marginTop: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, backgroundColor: palette.accentSoft, borderRadius: 12 }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="bluetooth" size={18} color={palette.accent} />
+                <Text style={{ color: palette.accent, fontSize: 14, fontWeight: '600' }}>Conectar dispositivo Bluetooth</Text>
+              </TouchableOpacity>
+              <View style={{ marginTop: 8, padding: 12, backgroundColor: palette.surface2, borderRadius: 12 }}>
+                <Text style={{ color: palette.textMuted, fontSize: 12, lineHeight: 18 }}>
+                  💡 El audio se enruta automáticamente al dispositivo Bluetooth conectado.
                 </Text>
               </View>
+              <TouchableOpacity onPress={loadDevices} style={{ marginTop: 8, alignSelf: 'center', padding: 6 }}>
+                <Text style={{ color: palette.textMuted, fontSize: 12 }}>Actualizar lista</Text>
+              </TouchableOpacity>
             </>
           )}
         </View>

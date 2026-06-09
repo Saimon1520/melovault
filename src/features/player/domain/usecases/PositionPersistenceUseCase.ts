@@ -1,6 +1,7 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
+import { shouldRememberPosition } from './positionPolicy';
 
 let songRepo: SongRepository | null = null;
 let playerStateRepo: PlayerStateRepository | null = null;
@@ -9,6 +10,19 @@ function repos() {
   if (!songRepo) songRepo = new SongRepository();
   if (!playerStateRepo) playerStateRepo = new PlayerStateRepository();
   return { songRepo, playerStateRepo };
+}
+
+// Cache the "remember position" decision for the active track so the 5s save
+// loop doesn't hit the DB every tick.
+let rememberCache: { id: string; remember: boolean } | null = null;
+async function remembersFor(trackId: string): Promise<boolean> {
+  if (rememberCache?.id === trackId) return rememberCache.remember;
+  const remember = await shouldRememberPosition(trackId);
+  rememberCache = { id: trackId, remember };
+  return remember;
+}
+export function invalidateRememberCache(): void {
+  rememberCache = null;
 }
 
 // Saves current position every N ms while playing
@@ -28,10 +42,15 @@ export async function startPositionPersistence(): Promise<void> {
       const track = await TrackPlayer.getActiveTrack();
       if (!track?.id) return;
 
-      await repos().songRepo.updateLastPosition(track.id as string, position);
+      const remember = await remembersFor(track.id as string);
+      // getPosition() is in seconds; we persist milliseconds everywhere.
+      const positionMs = Math.round(position * 1000);
+      if (remember) {
+        await repos().songRepo.updateLastPosition(track.id as string, positionMs);
+      }
       await repos().playerStateRepo.save({
         currentTrackId: track.id as string,
-        position,
+        position: remember ? positionMs : 0,
         queueIndex: await TrackPlayer.getActiveTrackIndex() ?? 0,
       });
     } catch {
@@ -47,13 +66,21 @@ export function stopPositionPersistence(): void {
   }
 }
 
-export async function savePositionOnTrackChange(): Promise<void> {
+// Called on Event.PlaybackActiveTrackChanged. The event carries the OUTGOING
+// track + the position it was at, so we can save where the user left a song
+// when they switch away from it (not the incoming track, which is at ~0).
+export async function savePositionOnTrackChange(
+  event?: { lastTrack?: { id?: string | number } | null; lastPosition?: number },
+): Promise<void> {
   try {
-    const position = await TrackPlayer.getPosition();
-    const track = await TrackPlayer.getActiveTrack();
-    if (!track?.id || position < 1) return;
+    invalidateRememberCache(); // the new active track gets a fresh decision
+    const lastId = event?.lastTrack?.id;
+    const lastPos = event?.lastPosition ?? 0;
+    if (lastId == null || lastPos < 1) return;
 
-    await repos().songRepo.updateLastPosition(track.id as string, position);
+    if (await shouldRememberPosition(String(lastId))) {
+      await repos().songRepo.updateLastPosition(String(lastId), Math.round(lastPos * 1000));
+    }
   } catch {
     // ignore
   }
@@ -67,24 +94,27 @@ export async function restoreLastSession(): Promise<void> {
     const song = await repos().songRepo.getById(saved.currentTrackId);
     if (!song) return;
 
+    const positionSec = (saved.position ?? 0) / 1000; // stored in ms
+
     const queue = await TrackPlayer.getQueue();
     const trackIndex = queue.findIndex(t => t.id === saved.currentTrackId);
 
     if (trackIndex !== -1) {
       await TrackPlayer.skip(trackIndex);
-      await TrackPlayer.seekTo(saved.position);
     } else {
       await TrackPlayer.add({
         id: song.id,
-        url: `file://${song.filePath}`,
+        url: song.filePath,
         title: song.title,
         artist: song.artist,
         album: song.album ?? undefined,
-        artwork: song.artworkPath ? `file://${song.artworkPath}` : undefined,
+        artwork: song.artworkPath || undefined, // already a file:// URI
         duration: song.duration,
       });
-      await TrackPlayer.seekTo(saved.position);
     }
+    if (positionSec > 0) await TrackPlayer.seekTo(positionSec);
+    // Open restored but paused — the user decides when to resume.
+    await TrackPlayer.pause();
   } catch {
     // If restore fails, start fresh
   }

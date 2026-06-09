@@ -58,3 +58,4 @@ ios/build/
 # Local device notes (personal info — never commit)
 *.local.md
 .device.local.*
+.claude/scheduled_tasks.lock

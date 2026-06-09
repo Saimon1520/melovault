@@ -10,6 +10,7 @@ import { palette } from '@/design-system/tokens/colors';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
+import { shouldRememberPosition } from '@/features/player/domain/usecases/positionPolicy';
 import type { Song } from '@/shared/types';
 import { useActiveTrack } from 'react-native-track-player';
 
@@ -52,7 +53,8 @@ export function SearchScreen() {
 
   const playSong = useCallback(async (song: Song) => {
     const index = results.findIndex(s => s.id === song.id);
-    await audioService.setQueue(results.length > 0 ? results : [song], index >= 0 ? index : 0, song.lastPosition);
+    const startPositionMs = (await shouldRememberPosition(song)) ? song.lastPosition : 0;
+    await audioService.setQueue(results.length > 0 ? results : [song], index >= 0 ? index : 0, startPositionMs);
   }, [results]);
 
   const clearSearch = () => {

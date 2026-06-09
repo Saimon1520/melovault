@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { palette } from '@/design-system/tokens/colors';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
+import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { FileSystemService } from '@/infrastructure/filesystem/FileSystemService';
 import { ArtworkPicker } from '@/features/library/presentation/components/ArtworkPicker';
+import { usePositionMemoryStore } from '@/features/player/store/positionMemoryStore';
+import { useArchiveStore } from '@/features/library/store/archiveStore';
 import type { Song, Playlist } from '@/shared/types';
 import { formatTime, formatFileSize } from '@/shared/utils/formatTime';
 
@@ -28,16 +31,27 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
   const [showArtworkPicker, setShowArtworkPicker] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [currentSong, setCurrentSong] = useState<Song | null>(song);
+  const [rememberPosition, setRememberPosition] = useState(false);
+  const [inheritedFromPlaylist, setInheritedFromPlaylist] = useState(false);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && song) {
       playlistRepo.getAll().then(setPlaylists);
       setShowPlaylists(false);
       setShowInfo(false);
       setShowArtworkPicker(false);
       setCurrentSong(song);
+      setRememberPosition(usePositionMemoryStore.getState().isRemembered(song.id));
+      playlistRepo.songIsInKeepPositionPlaylist(song.id).then(setInheritedFromPlaylist);
     }
   }, [visible, song]);
+
+  const toggleRememberPosition = async (value: boolean) => {
+    if (!song) return;
+    setRememberPosition(value);
+    usePositionMemoryStore.getState().setRemembered(song.id, value);
+    if (!value) await songRepo.clearPosition(song.id); // forget saved spot
+  };
 
   if (!song) return null;
 
@@ -88,6 +102,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
   const extraFields = song.extraMetadata
     ? Object.entries(song.extraMetadata).filter(([, v]) => v && v.trim() !== '')
     : [];
+  const songArchived = useArchiveStore.getState().isArchived(song);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -108,11 +123,37 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          {/* Remember playback position (per-song opt-in) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: palette.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+              <Ionicons name="bookmark-outline" size={18} color={palette.textSecondary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.textPrimary, fontSize: 16 }}>Recordar posición</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
+                {inheritedFromPlaylist
+                  ? 'Activado por una playlist que recuerda posición'
+                  : 'Retomar donde lo dejaste al volver a reproducir'}
+              </Text>
+            </View>
+            <Switch
+              value={rememberPosition || inheritedFromPlaylist}
+              onValueChange={toggleRememberPosition}
+              disabled={inheritedFromPlaylist}
+              trackColor={{ false: palette.surface3, true: palette.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+
           {/* Main actions */}
           {[
+            { icon: 'play-forward-outline' as const, label: 'Agregar a la cola', onPress: async () => { await TrackPlayerService.getInstance().addToQueue(song); onClose(); } },
             { icon: 'list-outline' as const, label: 'Agregar a playlist', onPress: () => setShowPlaylists(v => !v) },
             { icon: 'image-outline' as const, label: 'Cambiar portada', onPress: () => setShowArtworkPicker(true) },
             { icon: 'information-circle-outline' as const, label: 'Ver información', onPress: () => setShowInfo(v => !v) },
+            songArchived
+              ? { icon: 'arrow-undo-outline' as const, label: 'Quitar de archivados', onPress: () => { useArchiveStore.getState().setArchived(song.id, false); onClose(); } }
+              : { icon: 'archive-outline' as const, label: 'Archivar (no es música)', onPress: () => { useArchiveStore.getState().setArchived(song.id, true); onClose(); } },
             { icon: 'eye-off-outline' as const, label: 'Ocultar canción', onPress: handleHide, color: palette.warning },
             { icon: 'trash-outline' as const, label: 'Eliminar del dispositivo', onPress: handleDelete, color: palette.error },
           ].map(({ icon, label, onPress, color }) => (

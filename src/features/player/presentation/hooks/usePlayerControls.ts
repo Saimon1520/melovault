@@ -3,6 +3,7 @@ import { useProgress, useActiveTrack, State, usePlaybackState } from 'react-nati
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
+import { shuffle } from '@/shared/utils/shuffle';
 
 const service = TrackPlayerService.getInstance();
 
@@ -42,7 +43,22 @@ export function usePlayerControls() {
   }, [seekSeconds]);
 
   const toggleShuffle = useCallback(async () => {
-    setShuffleEnabled(!shuffleEnabled);
+    const next = !shuffleEnabled;
+    setShuffleEnabled(next);
+
+    // Reorder the upcoming tracks live, keeping the current song playing.
+    const { currentSong, originalQueue, setQueue } = usePlayerStore.getState();
+    if (!currentSong || originalQueue.length <= 1) return;
+
+    let upcoming;
+    if (next) {
+      upcoming = shuffle(originalQueue.filter(s => s.id !== currentSong.id));
+    } else {
+      const idx = originalQueue.findIndex(s => s.id === currentSong.id);
+      upcoming = originalQueue.slice(idx + 1);
+    }
+    setQueue([currentSong, ...upcoming], 0, originalQueue);
+    await service.reorderUpcoming(upcoming);
   }, [shuffleEnabled, setShuffleEnabled]);
 
   const cycleRepeat = useCallback(async () => {

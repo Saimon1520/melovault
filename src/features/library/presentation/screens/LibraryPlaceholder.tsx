@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
-  RefreshControl, ActivityIndicator, StatusBar,
+  RefreshControl, ActivityIndicator, StatusBar, FlatList,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { useActiveTrack } from 'react-native-track-player';
 import { palette } from '@/design-system/tokens/colors';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
@@ -14,6 +14,12 @@ import { SongRepository } from '@/features/library/data/repositories/SongReposit
 import { useLibraryScan } from '../hooks/useLibrary';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
+import { useArchiveStore } from '@/features/library/store/archiveStore';
+import { usePositionMemoryStore } from '@/features/player/store/positionMemoryStore';
+import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
+import { shuffle } from '@/shared/utils/shuffle';
+import { shouldRememberPosition } from '@/features/player/domain/usecases/positionPolicy';
+import { ArchivedSongsModal } from './ArchivedSongsModal';
 import type { Song, SortOrder } from '@/shared/types';
 
 type Tab = 'songs' | 'albums' | 'artists' | 'genres';
@@ -25,20 +31,66 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const audioService = TrackPlayerService.getInstance();
+const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
+
+interface SongGroup {
+  key: string;
+  label: string;
+  artwork?: string;
+  songs: Song[];
+}
+
+// Groups songs by album / artist / genre for the corresponding library tabs.
+function groupSongs(songs: Song[], by: 'albums' | 'artists' | 'genres'): SongGroup[] {
+  const fallback =
+    by === 'albums' ? 'Álbum desconocido' : by === 'artists' ? 'Artista desconocido' : 'Sin género';
+  const pick = (s: Song) =>
+    by === 'albums' ? s.album : by === 'artists' ? s.artist : s.genre;
+
+  const map = new Map<string, SongGroup>();
+  for (const s of songs) {
+    const raw = (pick(s) ?? '').trim();
+    const label = raw === '' || raw === 'Unknown Artist' || raw === 'Unknown Album' ? fallback : raw;
+    const key = label.toLowerCase();
+    let group = map.get(key);
+    if (!group) {
+      group = { key, label, artwork: s.artworkPath || undefined, songs: [] };
+      map.set(key, group);
+    }
+    if (!group.artwork && s.artworkPath) group.artwork = s.artworkPath;
+    group.songs.push(s);
+  }
+  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
 
 export function LibraryPlaceholder() {
   const repoRef = useRef<SongRepository | null>(null);
   if (!repoRef.current) repoRef.current = new SongRepository();
+  const playlistRepoRef = useRef<PlaylistRepository | null>(null);
+  if (!playlistRepoRef.current) playlistRepoRef.current = new PlaylistRepository();
   const [activeTab, setActiveTab] = useState<Tab>('songs');
+  const [selectedGroup, setSelectedGroup] = useState<SongGroup | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('title');
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const { isScanning, scanProgress, startScan } = useLibraryScan();
   const activeTrack = useActiveTrack();
   const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
+  // Re-derive archived split whenever the user archives/restores something.
+  const archivedIds = useArchiveStore(s => s.archivedIds);
+  const unarchivedIds = useArchiveStore(s => s.unarchivedIds);
+  // Position-memory markers: per-song opt-ins + songs inheriting from a
+  // keep-position playlist.
+  const rememberIds = usePositionMemoryStore(s => s.rememberIds);
+  const [keepPosIds, setKeepPosIds] = useState<string[]>([]);
+  const persistentIds = useMemo(
+    () => new Set([...rememberIds, ...keepPosIds]),
+    [rememberIds, keepPosIds],
+  );
 
   const loadSongs = useCallback(async () => {
     setLoading(true);
@@ -50,6 +102,7 @@ export function LibraryPlaceholder() {
           s.artist.toLowerCase().includes(q) ||
           s.album.toLowerCase().includes(q))
       : all);
+    playlistRepoRef.current!.getKeepPositionSongIds().then(setKeepPosIds).catch(() => {});
     setLoading(false);
   }, [sortOrder, searchQuery]);
 
@@ -60,16 +113,54 @@ export function LibraryPlaceholder() {
     if (result?.success) loadSongs();
   }, [startScan, loadSongs]);
 
-  const handleSongPress = useCallback(async (song: Song) => {
-    const idx = songs.findIndex(s => s.id === song.id);
-    setCurrentSong(song);
-    setQueue(songs, idx);
-    setQueueIndex(idx);
-    await audioService.setQueue(songs, idx, song.lastPosition);
-    await repoRef.current!.incrementPlayCount(song.id);
-  }, [songs, setCurrentSong, setQueue, setQueueIndex]);
+  // Play `song` queueing from `list` (the currently visible set: the full
+  // library, or a selected album/artist/genre). Respects shuffle.
+  const playFromList = useCallback(async (list: Song[], song: Song) => {
+    const idx = list.findIndex(s => s.id === song.id);
+    const shuffleEnabled = usePlayerStore.getState().shuffleEnabled;
 
-  const isEmpty = !loading && songs.length === 0 && !isScanning;
+    let playQueue = list;
+    let startIndex = idx;
+    if (shuffleEnabled) {
+      playQueue = [song, ...shuffle(list.filter((_, i) => i !== idx))];
+      startIndex = 0;
+    }
+
+    // Only resume mid-track when this song opted into position memory (or
+    // inherits it from a playlist); otherwise start from the beginning.
+    const startPositionMs = (await shouldRememberPosition(song)) ? song.lastPosition : 0;
+
+    setCurrentSong(song);
+    setQueue(playQueue, startIndex, list);
+    setQueueIndex(startIndex);
+    await audioService.setQueue(playQueue, startIndex, startPositionMs);
+    await repoRef.current!.incrementPlayCount(song.id);
+  }, [setCurrentSong, setQueue, setQueueIndex]);
+
+  // Switch tab and drop any open album/artist/genre detail view.
+  const selectTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    setSelectedGroup(null);
+  }, []);
+
+  // Split off archived (non-music) audio so it doesn't clutter the library.
+  const mainSongs = useMemo(
+    () => songs.filter(s => !useArchiveStore.getState().isArchived(s)),
+    [songs, archivedIds, unarchivedIds],
+  );
+  const archivedSongs = useMemo(
+    () => songs.filter(s => useArchiveStore.getState().isArchived(s)),
+    [songs, archivedIds, unarchivedIds],
+  );
+
+  const groups = useMemo(
+    () => (activeTab === 'songs' ? [] : groupSongs(mainSongs, activeTab)),
+    [mainSongs, activeTab],
+  );
+
+  // The song list currently shown (main library, or the open group's songs).
+  const visibleSongs = selectedGroup ? selectedGroup.songs : mainSongs;
+  const isEmpty = !loading && mainSongs.length === 0 && archivedSongs.length === 0 && !isScanning;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
@@ -135,7 +226,7 @@ export function LibraryPlaceholder() {
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 4 }}>
         {TABS.map(tab => (
           <TouchableOpacity
-            key={tab.key} onPress={() => setActiveTab(tab.key)}
+            key={tab.key} onPress={() => selectTab(tab.key)}
             style={{
               paddingHorizontal: 14, paddingVertical: 8, marginRight: 4, borderRadius: 20,
               backgroundColor: activeTab === tab.key ? palette.accentSoft : 'transparent',
@@ -172,16 +263,78 @@ export function LibraryPlaceholder() {
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Escanear música</Text>
           </TouchableOpacity>
         </View>
+      ) : activeTab !== 'songs' && !selectedGroup ? (
+        // Album / Artist / Genre groups
+        <FlatList
+          key={`groups-${activeTab}`}
+          data={groups}
+          keyExtractor={g => g.key}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => setSelectedGroup(item)}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 }}
+              accessibilityRole="button"
+            >
+              <ExpoImage
+                source={item.artwork ? { uri: item.artwork } : DEFAULT_ARTWORK}
+                style={{ width: 52, height: 52, borderRadius: activeTab === 'artists' ? 26 : 8, backgroundColor: palette.surface2 }}
+                contentFit="cover"
+              />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text numberOfLines={1} style={{ color: palette.textPrimary, fontSize: 15, fontWeight: '600' }}>{item.label}</Text>
+                <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
+                  {item.songs.length} {item.songs.length === 1 ? 'canción' : 'canciones'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+            </TouchableOpacity>
+          )}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 1, marginLeft: 80, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+          )}
+          contentContainerStyle={{ paddingBottom: 120 }}
+        />
       ) : (
-        <FlashList
-          data={songs}
-          estimatedItemSize={68}
+        // Song list — full library, or the songs of an open group
+        <FlatList
+          key={selectedGroup ? `group-${selectedGroup.key}` : 'all-songs'}
+          data={visibleSongs}
           keyExtractor={item => item.id}
+          ListHeaderComponent={
+            selectedGroup ? (
+              <TouchableOpacity
+                onPress={() => setSelectedGroup(null)}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 6 }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="chevron-back" size={20} color={palette.accent} />
+                <Text numberOfLines={1} style={{ color: palette.textPrimary, fontSize: 17, fontWeight: '700', flex: 1 }}>{selectedGroup.label}</Text>
+              </TouchableOpacity>
+            ) : activeTab === 'songs' && archivedSongs.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setShowArchived(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
+                accessibilityRole="button"
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: palette.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="archive-outline" size={20} color={palette.textSecondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: palette.textPrimary, fontSize: 15, fontWeight: '600' }}>Archivados</Text>
+                  <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>
+                    {archivedSongs.length} {archivedSongs.length === 1 ? 'audio' : 'audios'} (notificaciones, notas de voz…)
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+              </TouchableOpacity>
+            ) : null
+          }
           renderItem={({ item }) => (
             <SongListItem
               song={item}
               isPlaying={activeTrack?.id === item.id}
-              onPress={handleSongPress}
+              hasPersistence={persistentIds.has(item.id)}
+              onPress={(song) => playFromList(visibleSongs, song)}
               onLongPress={setSelectedSong}
             />
           )}
@@ -213,6 +366,16 @@ export function LibraryPlaceholder() {
           setSongs(prev => prev.filter(s => s.id !== id));
           setSelectedSong(null);
         }}
+      />
+
+      {/* Archived (non-music) audio — separate space */}
+      <ArchivedSongsModal
+        visible={showArchived}
+        songs={archivedSongs}
+        persistentIds={persistentIds}
+        onClose={() => setShowArchived(false)}
+        onPlay={(song) => playFromList(archivedSongs, song)}
+        onLongPress={setSelectedSong}
       />
     </SafeAreaView>
   );

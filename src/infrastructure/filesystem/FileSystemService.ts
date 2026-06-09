@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { Alert } from 'react-native';
 import type { Result } from '@/shared/types';
 

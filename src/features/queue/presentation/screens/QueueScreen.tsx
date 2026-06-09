@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Modal, Alert } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { View, Text, TouchableOpacity, Modal, Alert, FlatList } from 'react-native';
 import TrackPlayer, { Track, useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
@@ -83,7 +82,7 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '80%', paddingBottom: 24 }}>
+        <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', paddingBottom: 24 }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20 }}>
             <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>
@@ -105,10 +104,11 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
             {queue.length} canción{queue.length !== 1 ? 'es' : ''}
           </Text>
 
-          <FlashList
+          <FlatList
             data={queue}
-            estimatedItemSize={68}
+            style={{ flex: 1 }}
             keyExtractor={(item, idx) => `${String(item.id ?? '')}_${idx}`}
+            contentContainerStyle={{ paddingBottom: 16 }}
             renderItem={({ item, index }) => {
               const isCurrent = index === activeIndex;
               return (

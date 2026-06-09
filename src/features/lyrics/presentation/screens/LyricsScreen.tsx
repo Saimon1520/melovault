@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,9 +49,20 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
         setLyrics(result.plainLyrics);
         if (songId) await repo.updateLyrics(songId, result.plainLyrics);
       } else {
-        setLyrics('No se encontraron letras para esta canción.');
+        // Keep the empty state (with the write/paste action) and let the user
+        // know, instead of overwriting the view with an error string.
+        Alert.alert(
+          'Sin resultados',
+          'No se encontraron letras online. Puedes pegarlas tú mismo (por ejemplo, copiadas de tu navegador).',
+          [
+            { text: 'Cerrar', style: 'cancel' },
+            { text: 'Escribir/Pegar', onPress: () => { setEditText(''); setIsEditing(true); } },
+          ],
+        );
       }
-    } catch { setLyrics('Error al buscar letras. Revisa tu conexión.'); }
+    } catch {
+      Alert.alert('Error', 'No se pudo buscar letras. Revisa tu conexión.');
+    }
     setLoading(false);
   }, [activeTrack, songId]);
 
@@ -159,16 +170,26 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
           <Ionicons name="musical-note" size={48} color={palette.accentSoft} />
           <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>Sin letras</Text>
           <Text style={{ color: palette.textMuted, fontSize: 14, textAlign: 'center', marginTop: 8 }}>
-            Toca ↓ para buscar online o ✏ para escribirlas manualmente
+            Búscalas online, o pégalas tú mismo desde tu navegador.
           </Text>
-          <TouchableOpacity
-            onPress={fetchFromLRCLib}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: palette.accent, borderRadius: 24 }}
-            accessibilityRole="button"
-          >
-            <Ionicons name="cloud-download-outline" size={18} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Buscar letras</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+            <TouchableOpacity
+              onPress={fetchFromLRCLib}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: palette.accent, borderRadius: 24 }}
+              accessibilityRole="button"
+            >
+              <Ionicons name="cloud-download-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Buscar online</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setEditText(''); setIsEditing(true); }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: palette.surface2, borderRadius: 24 }}
+              accessibilityRole="button"
+            >
+              <Ionicons name="create-outline" size={18} color={palette.textSecondary} />
+              <Text style={{ color: palette.textSecondary, fontWeight: '600' }}>Escribir/Pegar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </KeyboardAvoidingView>

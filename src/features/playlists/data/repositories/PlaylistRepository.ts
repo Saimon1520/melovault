@@ -128,6 +128,37 @@ export class PlaylistRepository {
     }
   }
 
+  // True if the song belongs to any playlist configured to remember position.
+  // Used so a song inherits position persistence from such a playlist without
+  // needing its own per-song flag enabled.
+  async songIsInKeepPositionPlaylist(songId: string): Promise<boolean> {
+    const junctions = await this.junctions.query(Q.where('song_id', songId)).fetch();
+    if (junctions.length === 0) return false;
+    const playlistIds = [...new Set(junctions.map(j => j.playlistId))];
+    for (const pid of playlistIds) {
+      try {
+        const p = await this.playlists.find(pid);
+        if (p.keepPosition) return true;
+      } catch {
+        // playlist gone — ignore
+      }
+    }
+    return false;
+  }
+
+  // All song IDs that inherit position memory from a keep-position playlist.
+  // Used to flag those songs in the library list.
+  async getKeepPositionSongIds(): Promise<string[]> {
+    const keepPlaylists = await this.playlists.query(Q.where('keep_position', true)).fetch();
+    if (keepPlaylists.length === 0) return [];
+    const ids = new Set<string>();
+    for (const p of keepPlaylists) {
+      const junctions = await this.junctions.query(Q.where('playlist_id', p.id)).fetch();
+      for (const j of junctions) ids.add(j.songId);
+    }
+    return [...ids];
+  }
+
   async savePlaybackPosition(playlistId: string, songId: string, positionMs: number): Promise<void> {
     await database.write(async () => {
       const record = await this.playlists.find(playlistId);

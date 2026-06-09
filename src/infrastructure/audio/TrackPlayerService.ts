@@ -93,12 +93,26 @@ export class TrackPlayerService {
     await TrackPlayer.play();
   }
 
+  // Replaces the tracks AFTER the current one without interrupting playback —
+  // used to apply/undo shuffle while a song is already playing.
+  async reorderUpcoming(upcomingSongs: Song[]): Promise<void> {
+    await TrackPlayer.removeUpcomingTracks();
+    if (upcomingSongs.length > 0) {
+      await TrackPlayer.add(upcomingSongs.map(s => this.songToTrack(s)));
+    }
+  }
+
   async pause(): Promise<void> {
     await TrackPlayer.pause();
   }
 
   async resume(): Promise<void> {
     await TrackPlayer.play();
+  }
+
+  // Append a song to the end of the current queue (does not change playback).
+  async addToQueue(song: Song): Promise<void> {
+    await TrackPlayer.add(this.songToTrack(song));
   }
 
   async stop(): Promise<void> {

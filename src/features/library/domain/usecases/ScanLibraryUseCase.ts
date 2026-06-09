@@ -74,6 +74,7 @@ export class ScanLibraryUseCase {
         data: { added, skipped, total: rawSongs.length },
       };
     } catch (error) {
+      console.error('[ScanLibrary] FAILED:', error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : '');
       return {
         success: false,
         error: error instanceof Error ? error : new Error('Scan failed'),
