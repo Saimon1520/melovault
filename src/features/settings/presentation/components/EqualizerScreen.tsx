@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { palette } from '@/design-system/tokens/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import type { EqualizerBand, EqualizerPreset } from '@/shared/types';
@@ -73,6 +74,7 @@ function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: 
 }
 
 export function EqualizerScreen({ onClose }: { onClose: () => void }) {
+  const insets = useSafeAreaInsets();
   const {
     persistEqualizer, setPersistEqualizer, setEqualizerState,
     equalizerEnabled, equalizerPreset, equalizerGains,
@@ -150,7 +152,7 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
   }, [enabled, selectedPreset, bands, setPersistEqualizer, setEqualizerState]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
+    <View style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}>
       <ResponsivePane maxWidth={520}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 24 }}>
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar ecualizador">
