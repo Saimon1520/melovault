@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
@@ -59,7 +59,18 @@ export function SettingsPlaceholder() {
     crossfadeMs, setCrossfadeMs,
     gaplessPlayback, setGaplessPlayback,
     defaultSpeed, setDefaultSpeed,
+    playDuringMeetings, setPlayDuringMeetings,
   } = useSettingsStore();
+
+  const toggleMeetings = (value: boolean) => {
+    setPlayDuringMeetings(value);
+    Alert.alert(
+      value ? 'Reproducir en reuniones activado' : 'Ajuste actualizado',
+      value
+        ? 'La música seguirá sonando durante llamadas y reuniones (sonará junto al audio de la reunión). Reinicia la app para aplicar el cambio.'
+        : 'La música volverá a pausarse durante llamadas y reuniones. Reinicia la app para aplicar el cambio.',
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
@@ -103,6 +114,14 @@ export function SettingsPlaceholder() {
               value={crossfadeMs}
               onChange={setCrossfadeMs}
               format={v => v === 0 ? 'Off' : `${v / 1000}s`}
+            />
+          </SettingRow>
+          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <SettingRow label="Reproducir en reuniones y llamadas" description="No pausar la música cuando otra app (Meet, Zoom…) usa el audio. Aplica al reiniciar.">
+            <Switch
+              value={playDuringMeetings} onValueChange={toggleMeetings}
+              trackColor={{ false: palette.surface3, true: palette.accentDim }}
+              thumbColor={playDuringMeetings ? palette.accent : palette.textMuted}
             />
           </SettingRow>
         </View>

@@ -5,7 +5,19 @@ import TrackPlayer, {
   AppKilledPlaybackBehavior,
   type Track,
 } from 'react-native-track-player';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Song, RepeatMode, PlaybackSpeed } from '@/shared/types';
+
+// Read one persisted setting before the zustand store has hydrated (setup runs
+// at startup). Returns false if anything is missing.
+async function readPlayDuringMeetings(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem('@melovault/settings');
+    return raw ? !!JSON.parse(raw)?.state?.playDuringMeetings : false;
+  } catch {
+    return false;
+  }
+}
 
 export class TrackPlayerService {
   private static instance: TrackPlayerService;
@@ -18,11 +30,17 @@ export class TrackPlayerService {
   }
 
   async setup(): Promise<void> {
+    // When "play during meetings" is on we must NOT auto-handle interruptions,
+    // because that maps to kotlinaudio's handleAudioFocus — keeping it off means
+    // the player never yields focus, so music plays over calls/meetings.
+    const playDuringMeetings = await readPlayDuringMeetings();
+
     await TrackPlayer.setupPlayer({
       maxCacheSize: 1024 * 5, // 5MB
-      // autoHandleInterruptions: true enables pause-on-headphone-disconnect
-      // and pause when another app takes audio focus (calls, alarms, etc.)
-      autoHandleInterruptions: true,
+      // autoHandleInterruptions: true → pause on headphone-disconnect and when
+      // another app (call, alarm, meeting) takes audio focus. Disabled when the
+      // user wants playback to continue over meetings.
+      autoHandleInterruptions: !playDuringMeetings,
     });
 
     await TrackPlayer.updateOptions({
