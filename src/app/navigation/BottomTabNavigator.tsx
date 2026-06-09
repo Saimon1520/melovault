@@ -90,7 +90,7 @@ export function BottomTabNavigator() {
       {/* Mini player sits just above the tab bar (which is ~49pt tall + the
           bottom safe-area inset) so it never overlaps the navigation buttons */}
       {activeTrack && !nowPlayingOpen && (
-        <View style={{ position: 'absolute', bottom: 53 + insets.bottom, left: 0, right: 0, zIndex: 50 }}>
+        <View style={{ position: 'absolute', bottom: 53 + insets.bottom, left: insets.left, right: insets.right, zIndex: 50 }}>
           <MiniPlayer
             onExpand={() => {
               setActiveSongId(activeTrack.id ? String(activeTrack.id) : undefined);

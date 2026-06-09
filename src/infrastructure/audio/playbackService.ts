@@ -2,8 +2,11 @@ import TrackPlayer, { Event } from 'react-native-track-player';
 import { savePositionOnTrackChange } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
+import { usePlayerStore } from '@/features/player/store/playerStore';
+import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 
 const fade = FadeController.getInstance();
+const songRepo = new SongRepository();
 
 // Runs in a dedicated JS thread for background audio playback.
 // Registered in index.js via TrackPlayer.registerPlaybackService()
@@ -24,6 +27,8 @@ export async function PlaybackService() {
   // autoHandleInterruptions=true in setupPlayer handles most of this,
   // but we add explicit pause here for Bluetooth disconnect edge cases.
   TrackPlayer.addEventListener(Event.RemoteDuck, async (event) => {
+    // When the user opted to keep playing over calls/meetings, ignore focus loss.
+    if (useSettingsStore.getState().playDuringMeetings) return;
     if (event.permanent) {
       // Another app permanently took audio (phone call ended, etc.) — stop
       await TrackPlayer.stop();
@@ -50,6 +55,16 @@ export async function PlaybackService() {
   // ── Save position + fade the new track in ────────────────────────────────
   TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
     await savePositionOnTrackChange(event);
+    // Keep the store's current song in sync with whatever is actually playing
+    // (queue auto-advance, remote next/prev…) so the player UI + "…" menu act on
+    // the right song.
+    try {
+      const newId = event.track?.id ?? (await TrackPlayer.getActiveTrack())?.id;
+      if (newId != null) {
+        const song = await songRepo.getById(String(newId));
+        if (song) usePlayerStore.getState().setCurrentSong(song);
+      }
+    } catch { /* ignore */ }
     const crossfadeMs = useSettingsStore.getState().crossfadeMs;
     if (crossfadeMs > 0) {
       await fade.fadeIn(crossfadeMs);

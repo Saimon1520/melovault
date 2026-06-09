@@ -201,7 +201,7 @@ export function PlaylistDetailScreen({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="light-content" />
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 }}>

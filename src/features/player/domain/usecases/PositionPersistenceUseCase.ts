@@ -1,6 +1,7 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 import { shouldRememberPosition } from './positionPolicy';
 
 let songRepo: SongRepository | null = null;
@@ -93,6 +94,10 @@ export async function restoreLastSession(): Promise<void> {
 
     const song = await repos().songRepo.getById(saved.currentTrackId);
     if (!song) return;
+
+    // Make the restored song the store's current song so the player UI (e.g. the
+    // "…" options menu) has a song to act on after a cold start.
+    usePlayerStore.getState().setCurrentSong(song);
 
     const positionSec = (saved.position ?? 0) / 1000; // stored in ms
 
