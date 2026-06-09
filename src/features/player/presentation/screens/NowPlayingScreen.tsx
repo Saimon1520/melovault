@@ -81,10 +81,10 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
     transform: [{ scale: artworkScale.value }],
   }));
 
-  // Cap the artwork by screen height too, so on this layout the controls and
-  // speed row always fit above the navigation bar.
-  const { height: winH } = useWindowDimensions();
-  const size = Math.min(artworkSize.normal, winH * 0.32);
+  // Responsive artwork: cap by both width and height so it shrinks in landscape
+  // (where height is scarce) and the controls remain reachable via scrolling.
+  const { width: winW, height: winH } = useWindowDimensions();
+  const size = Math.min(winW * 0.72, winH * 0.42);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -92,51 +92,58 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
           flex: 1,
           backgroundColor: palette.surface0,
           paddingTop: insets.top,
+          // Respect side cutouts / nav bar when the phone is folded or rotated.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
           // Guard against devices that under-report the bottom inset so the
           // speed row never sits under the system navigation bar.
           paddingBottom: Math.max(insets.bottom, 24) + 12,
         }]}>
           <StatusBar barStyle="light-content" />
 
-          {/* Swipe-to-dismiss is limited to the top area so it never steals
-              taps from the playback controls below. */}
+          {/* Swipe-to-dismiss zone — ONLY the drag handle, so it never steals
+              taps from the header buttons or the controls below. */}
           <GestureDetector gesture={dismissGesture}>
-            <View>
-              {/* Drag handle */}
-              <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
-                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              </View>
-
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 }}>
-                <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar">
-                  <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
-                </TouchableOpacity>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
-                  REPRODUCIENDO
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <TouchableOpacity
-                    onPress={() => setShowSleepTimer(v => !v)}
-                    style={{ padding: 4 }}
-                    accessibilityRole="button" accessibilityLabel="Sleep timer"
-                  >
-                    <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setShowOptions(true)}
-                    style={{ padding: 4 }}
-                    accessibilityRole="button" accessibilityLabel="Más opciones"
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+            <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 8 }}>
+              <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)' }} />
             </View>
           </GestureDetector>
 
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 }}>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar">
+              <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
+            </TouchableOpacity>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
+              REPRODUCIENDO
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              <TouchableOpacity
+                onPress={() => setShowSleepTimer(v => !v)}
+                style={{ padding: 8 }}
+                accessibilityRole="button" accessibilityLabel="Sleep timer"
+              >
+                <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowOptions(true)}
+                style={{ padding: 8 }}
+                accessibilityRole="button" accessibilityLabel="Más opciones"
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Scrollable body — lets every control be reached in landscape,
+              where the full layout is taller than the screen. */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+            showsVerticalScrollIndicator={false}
+          >
           {/* Artwork */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
             <Animated.View style={[artworkStyle, {
               width: size, height: size, borderRadius: 20,
               shadowColor: '#000',
@@ -214,6 +221,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
             <VolumeControl />
             <SpeedControl />
           </View>
+          </ScrollView>
         </Animated.View>
 
       {/* Info modal (full metadata) */}

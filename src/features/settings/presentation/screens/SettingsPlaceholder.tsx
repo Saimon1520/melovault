@@ -73,13 +73,13 @@ export function SettingsPlaceholder() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" />
       <Text style={{ color: palette.textPrimary, fontSize: 26, fontWeight: '800', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
         Ajustes
       </Text>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         <SectionHeader title="REPRODUCCIÓN" />
         <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
           <SettingRow label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">

@@ -163,7 +163,7 @@ export function LibraryPlaceholder() {
   const isEmpty = !loading && mainSongs.length === 0 && archivedSongs.length === 0 && !isScanning;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={palette.surface0} />
 
       {/* Header */}

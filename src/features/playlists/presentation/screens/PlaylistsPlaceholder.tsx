@@ -188,7 +188,7 @@ export function PlaylistsPlaceholder() {
   }, [loadPlaylists]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" />
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 26, fontWeight: '800' }}>Playlists</Text>
