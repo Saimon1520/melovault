@@ -73,7 +73,7 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
 
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 }}>
+          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', padding: 24 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
               <Ionicons name="moon" size={22} color={palette.accent} />
               <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700', marginLeft: 10 }}>Sleep Timer</Text>

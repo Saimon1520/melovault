@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { palette } from '@/design-system/tokens/colors';
+import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import type { EqualizerBand, EqualizerPreset } from '@/shared/types';
 
@@ -150,6 +151,7 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
+      <ResponsivePane maxWidth={520}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 24 }}>
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar ecualizador">
           <Ionicons name="chevron-down" size={24} color={palette.textSecondary} />
@@ -227,6 +229,7 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
           thumbColor="#fff"
         />
       </View>
+      </ResponsivePane>
     </View>
   );
 }
