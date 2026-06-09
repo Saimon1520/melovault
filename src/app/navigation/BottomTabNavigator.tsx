@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, BackHandler, ToastAndroid, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import type { BottomTabParamList } from './types';
@@ -29,6 +30,24 @@ export function BottomTabNavigator() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [activeSongId, setActiveSongId] = useState<string | undefined>();
   const activeTrack = useActiveTrack();
+  const insets = useSafeAreaInsets();
+  const lastBackRef = useRef(0);
+
+  // Hardware back: close the queue/now-playing overlays first; from the library
+  // require a double press to actually leave the app.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (queueOpen) { setQueueOpen(false); return true; }
+      if (nowPlayingOpen) { setNowPlayingOpen(false); return true; }
+      const now = Date.now();
+      if (now - lastBackRef.current < 2000) return false; // exit the app
+      lastBackRef.current = now;
+      ToastAndroid.show('Presiona atrás otra vez para salir', ToastAndroid.SHORT);
+      return true;
+    });
+    return () => sub.remove();
+  }, [nowPlayingOpen, queueOpen]);
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
@@ -68,9 +87,10 @@ export function BottomTabNavigator() {
         <Tab.Screen name="Settings" component={SettingsPlaceholder} options={{ title: 'Ajustes' }} />
       </Tab.Navigator>
 
-      {/* Mini player sits above the tab bar when a song is loaded */}
+      {/* Mini player sits just above the tab bar (which is ~49pt tall + the
+          bottom safe-area inset) so it never overlaps the navigation buttons */}
       {activeTrack && !nowPlayingOpen && (
-        <View style={{ position: 'absolute', bottom: 60, left: 0, right: 0, zIndex: 50 }}>
+        <View style={{ position: 'absolute', bottom: 53 + insets.bottom, left: 0, right: 0, zIndex: 50 }}>
           <MiniPlayer
             onExpand={() => {
               setActiveSongId(activeTrack.id ? String(activeTrack.id) : undefined);

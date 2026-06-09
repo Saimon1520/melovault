@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, NativeModules } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { restoreLastSession, startPositionPersistence } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { OnboardingScreen } from '@/features/onboarding/presentation/screens/OnboardingScreen';
 import { palette } from '@/design-system/tokens/colors';
 
@@ -26,6 +27,15 @@ export function Providers({ children }: ProvidersProps) {
           .catch((err) => {
             if (!String(err).includes('already')) throw err;
           });
+
+        // Re-apply a remembered equalizer (opt-in). AudioEffects holds the
+        // gains until the ExoPlayer audio session is ready, then applies them.
+        const settings = useSettingsStore.getState();
+        if (settings.persistEqualizer && settings.equalizerEnabled) {
+          const AudioControl = NativeModules.AudioControl;
+          AudioControl?.setGains?.(settings.equalizerGains.map((g) => Math.round(g * 100)));
+          AudioControl?.setEqEnabled?.(true);
+        }
 
         // Check if onboarding was completed
         const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);

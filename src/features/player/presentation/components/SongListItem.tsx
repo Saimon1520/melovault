@@ -11,12 +11,13 @@ const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 interface SongListItemProps {
   song: Song;
   isPlaying?: boolean;
+  hasPersistence?: boolean;
   onPress: (song: Song) => void;
   onLongPress?: (song: Song) => void;
 }
 
 export const SongListItem = memo(function SongListItem({
-  song, isPlaying, onPress, onLongPress,
+  song, isPlaying, hasPersistence, onPress, onLongPress,
 }: SongListItemProps) {
   return (
     <TouchableOpacity
@@ -65,6 +66,17 @@ export const SongListItem = memo(function SongListItem({
         </Text>
       </View>
 
+      {/* Position-memory marker */}
+      {hasPersistence && (
+        <Ionicons
+          name="bookmark"
+          size={13}
+          color={palette.persistenceActive}
+          style={{ marginLeft: 4 }}
+          accessibilityLabel="Recuerda posición"
+        />
+      )}
+
       {/* Duration */}
       <Text style={{ color: palette.textMuted, fontSize: 12, marginHorizontal: 8 }}>
         {formatTime(song.duration)}
@@ -84,5 +96,6 @@ export const SongListItem = memo(function SongListItem({
   );
 }, (prev, next) =>
   prev.song.id === next.song.id &&
-  prev.isPlaying === next.isPlaying
+  prev.isPlaying === next.isPlaying &&
+  prev.hasPersistence === next.hasPersistence
 );

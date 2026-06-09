@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // WatermelonDB model fields are initialized by @text/@field decorators at
+    // runtime, not in a constructor, so disable this strict sub-check.
+    "strictPropertyInitialization": false,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
@@ -9,19 +12,33 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/app/*": ["src/app/*"],
-      "@/features/*": ["src/features/*"],
-      "@/shared/*": ["src/shared/*"],
-      "@/infrastructure/*": ["src/infrastructure/*"],
-      "@/design-system/*": ["src/design-system/*"],
-      "@/assets/*": ["assets/*"]
+      "@/app/*": [
+        "src/app/*"
+      ],
+      "@/features/*": [
+        "src/features/*"
+      ],
+      "@/shared/*": [
+        "src/shared/*"
+      ],
+      "@/infrastructure/*": [
+        "src/infrastructure/*"
+      ],
+      "@/design-system/*": [
+        "src/design-system/*"
+      ],
+      "@/assets/*": [
+        "assets/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.d.ts",
-    "expo-env.d.ts"
+    "nativewind-env.d.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

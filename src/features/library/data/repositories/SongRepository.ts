@@ -138,6 +138,14 @@ export class SongRepository {
     });
   }
 
+  // Forget the saved resume point (used when a song's position memory is off).
+  async clearPosition(id: string): Promise<void> {
+    await database.write(async () => {
+      const record = await this.collection.find(id);
+      await record.update(r => { r.lastPosition = 0; });
+    });
+  }
+
   async incrementPlayCount(id: string): Promise<void> {
     await database.write(async () => {
       const record = await this.collection.find(id);

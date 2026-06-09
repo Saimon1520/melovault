@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   runOnJS, interpolate, Extrapolation,
@@ -22,6 +22,7 @@ import { SongOptionsModal } from '../components/SongOptionsModal';
 import { VolumeControl } from '../components/VolumeControl';
 import { SpeedControl } from '../components/SpeedControl';
 import { usePlayerStore } from '@/features/player/store/playerStore';
+import { useFavoritesStore } from '@/features/player/store/favoritesStore';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
@@ -43,6 +44,11 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
+  const trackId = activeTrack?.id ? String(activeTrack.id) : undefined;
+  const favoriteIds = useFavoritesStore(s => s.favoriteIds);
+  const toggleFavorite = useFavoritesStore(s => s.toggleFavorite);
+  const isFavorite = trackId ? favoriteIds.includes(trackId) : false;
+
   const translateY = useSharedValue(0);
   const artworkScale = useSharedValue(isPlaying ? 1 : 0.88);
 
@@ -51,6 +57,10 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   }, [isPlaying]);
 
   const dismissGesture = Gesture.Pan()
+    // Only claim downward vertical drags so horizontal controls (volume,
+    // progress) keep working.
+    .activeOffsetY([18, 9999])
+    .failOffsetX([-15, 15])
     .onUpdate(({ translationY: ty }) => {
       if (ty > 0) translateY.value = ty;
     })
@@ -71,52 +81,62 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
     transform: [{ scale: artworkScale.value }],
   }));
 
-  const size = artworkSize.normal;
+  // Cap the artwork by screen height too, so on this layout the controls and
+  // speed row always fit above the navigation bar.
+  const { height: winH } = useWindowDimensions();
+  const size = Math.min(artworkSize.normal, winH * 0.32);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <GestureDetector gesture={dismissGesture}>
         <Animated.View style={[screenStyle, {
           flex: 1,
           backgroundColor: palette.surface0,
           paddingTop: insets.top,
-          paddingBottom: insets.bottom + 8,
+          // Guard against devices that under-report the bottom inset so the
+          // speed row never sits under the system navigation bar.
+          paddingBottom: Math.max(insets.bottom, 24) + 12,
         }]}>
           <StatusBar barStyle="light-content" />
 
-          {/* Drag handle */}
-          <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-          </View>
+          {/* Swipe-to-dismiss is limited to the top area so it never steals
+              taps from the playback controls below. */}
+          <GestureDetector gesture={dismissGesture}>
+            <View>
+              {/* Drag handle */}
+              <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+              </View>
 
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 }}>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar">
-              <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
-            </TouchableOpacity>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
-              REPRODUCIENDO
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 4 }}>
-              <TouchableOpacity
-                onPress={() => setShowSleepTimer(v => !v)}
-                style={{ padding: 4 }}
-                accessibilityRole="button" accessibilityLabel="Sleep timer"
-              >
-                <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowOptions(true)}
-                style={{ padding: 4 }}
-                accessibilityRole="button" accessibilityLabel="Más opciones"
-              >
-                <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
-              </TouchableOpacity>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 }}>
+                <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar">
+                  <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
+                </TouchableOpacity>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
+                  REPRODUCIENDO
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowSleepTimer(v => !v)}
+                    style={{ padding: 4 }}
+                    accessibilityRole="button" accessibilityLabel="Sleep timer"
+                  >
+                    <Ionicons name="moon-outline" size={22} color={palette.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowOptions(true)}
+                    style={{ padding: 4 }}
+                    accessibilityRole="button" accessibilityLabel="Más opciones"
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={22} color={palette.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
+          </GestureDetector>
 
           {/* Artwork */}
-          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
             <Animated.View style={[artworkStyle, {
               width: size, height: size, borderRadius: 20,
               shadowColor: '#000',
@@ -143,8 +163,14 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
                 {activeTrack?.artist ?? 'Artista desconocido'}
               </Text>
             </View>
-            <TouchableOpacity style={{ padding: 8 }} accessibilityRole="button" accessibilityLabel="Me gusta">
-              <Ionicons name="heart-outline" size={24} color={palette.textMuted} />
+            <TouchableOpacity
+              style={{ padding: 8 }}
+              onPress={() => trackId && toggleFavorite(trackId)}
+              disabled={!trackId}
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            >
+              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? palette.accent : palette.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -188,29 +214,46 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
             <VolumeControl />
             <SpeedControl />
           </View>
+        </Animated.View>
 
-          {/* Info panel */}
-          {showInfo && activeTrack && (
-            <ScrollView style={{ maxHeight: 140, marginHorizontal: 20, marginTop: 8, backgroundColor: palette.surface2, borderRadius: 16 }}>
-              <View style={{ padding: 16 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 10 }}>
-                  INFORMACIÓN
-                </Text>
-                {[
-                  ['Álbum', activeTrack.album],
-                  ['Artista', activeTrack.artist],
-                  ['Duración', activeTrack.duration ? `${Math.floor(activeTrack.duration / 60)}:${String(Math.floor(activeTrack.duration % 60)).padStart(2, '0')}` : null],
-                ].filter(([, v]) => v).map(([label, value]) => (
-                  <View key={label as string} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ color: palette.textMuted, fontSize: 13 }}>{label}</Text>
-                    <Text style={{ color: palette.textSecondary, fontSize: 13, maxWidth: '60%', textAlign: 'right' }} numberOfLines={1}>{value}</Text>
+      {/* Info modal (full metadata) */}
+      <Modal visible={showInfo} animationType="fade" transparent onRequestClose={() => setShowInfo(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '75%' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>Información</Text>
+              <TouchableOpacity onPress={() => setShowInfo(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={palette.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {([
+                ['Título', currentSong?.title ?? activeTrack?.title],
+                ['Artista', currentSong?.artist ?? activeTrack?.artist],
+                ['Álbum', currentSong?.album ?? activeTrack?.album],
+                ['Año', currentSong?.year],
+                ['Género', currentSong?.genre],
+                ['Disquera', currentSong?.label],
+                ['Compositor', currentSong?.composer],
+                ['Duración', currentSong?.duration
+                  ? `${Math.floor(currentSong.duration / 60000)}:${String(Math.floor((currentSong.duration % 60000) / 1000)).padStart(2, '0')}`
+                  : null],
+                ['Bitrate', currentSong?.bitRate ? `${currentSong.bitRate} kbps` : null],
+                ['Sample rate', currentSong?.sampleRate ? `${currentSong.sampleRate} Hz` : null],
+                ['Pista', currentSong?.trackNumber ? String(currentSong.trackNumber) : null],
+                ['Archivo', currentSong?.filePath],
+              ] as [string, string | undefined | null][])
+                .filter(([, v]) => v)
+                .map(([label, value]) => (
+                  <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Text style={{ color: palette.textMuted, fontSize: 13, marginRight: 12, flexShrink: 0 }}>{label}</Text>
+                    <Text style={{ color: palette.textSecondary, fontSize: 13, flex: 1, textAlign: 'right' }} numberOfLines={2}>{value}</Text>
                   </View>
                 ))}
-              </View>
             </ScrollView>
-          )}
-        </Animated.View>
-      </GestureDetector>
+          </View>
+        </View>
+      </Modal>
 
       {/* Sleep Timer — renders badge + modal */}
       <SleepTimerModal visible={showSleepTimer} onClose={() => setShowSleepTimer(false)} />

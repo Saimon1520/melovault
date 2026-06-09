@@ -1,5 +1,9 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
 import { savePositionOnTrackChange } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { FadeController } from '@/infrastructure/audio/FadeController';
+import { useSettingsStore } from '@/features/settings/store/settingsStore';
+
+const fade = FadeController.getInstance();
 
 // Runs in a dedicated JS thread for background audio playback.
 // Registered in index.js via TrackPlayer.registerPlaybackService()
@@ -43,9 +47,27 @@ export async function PlaybackService() {
     }
   });
 
-  // ── Save position when track changes ─────────────────────────────────────
-  TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async () => {
-    await savePositionOnTrackChange();
+  // ── Save position + fade the new track in ────────────────────────────────
+  TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
+    await savePositionOnTrackChange(event);
+    const crossfadeMs = useSettingsStore.getState().crossfadeMs;
+    if (crossfadeMs > 0) {
+      await fade.fadeIn(crossfadeMs);
+    } else {
+      await fade.reset();
+    }
+  });
+
+  // ── Crossfade: fade the current track out as it approaches its end ───────
+  // (fires every `progressUpdateEventInterval` seconds). The next track is
+  // faded back in by the track-changed handler above.
+  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (e) => {
+    const crossfadeMs = useSettingsStore.getState().crossfadeMs;
+    if (crossfadeMs <= 0 || !e.duration) return;
+    const remainingMs = (e.duration - e.position) * 1000;
+    if (remainingMs > 0 && remainingMs <= crossfadeMs && !fade.isFadingOut()) {
+      fade.fadeOut(remainingMs);
+    }
   });
 
   // ── Track end — advance queue ─────────────────────────────────────────────

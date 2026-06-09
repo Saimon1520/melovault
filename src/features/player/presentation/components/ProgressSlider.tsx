@@ -19,8 +19,12 @@ export function ProgressSlider() {
   // SharedValue that worklets can safely read — avoids stale JS closure capture
   const progressSV = useDerivedValue(() => (duration > 0 ? position / duration : 0));
 
-  const seekTo = async (pos: number) => {
-    await TrackPlayer.seekTo(pos * duration);
+  // Seek, then keep the thumb pinned at the target until useProgress (which
+  // updates ~every 250ms) catches up — otherwise the thumb appears not to move
+  // until the next tick (felt like needing a second tap).
+  const seekToAndHold = async (pos: number) => {
+    if (duration > 0) await TrackPlayer.seekTo(pos * duration);
+    setTimeout(() => { isSeeking.value = false; }, 400);
   };
 
   const pan = Gesture.Pan()
@@ -36,14 +40,16 @@ export function ProgressSlider() {
     })
     .onEnd(() => {
       thumbScale.value = withSpring(1, { damping: 15, stiffness: 300 });
-      runOnJS(seekTo)(seekProgress.value);
-      isSeeking.value = false;
+      runOnJS(seekToAndHold)(seekProgress.value);
     });
 
   const tap = Gesture.Tap().onEnd((e) => {
     if (sliderWidth.value > 0) {
       const pos = Math.max(0, Math.min(1, e.x / sliderWidth.value));
-      runOnJS(seekTo)(pos);
+      // Jump the thumb immediately so a single tap feels responsive.
+      seekProgress.value = pos;
+      isSeeking.value = true;
+      runOnJS(seekToAndHold)(pos);
     }
   });
 

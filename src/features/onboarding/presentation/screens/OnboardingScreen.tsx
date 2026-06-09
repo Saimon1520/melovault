@@ -4,7 +4,7 @@ import {
   Platform, PermissionsAndroid, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { palette } from '@/design-system/tokens/colors';
 import { ScanLibraryUseCase, type ScanResult } from '@/features/library/domain/usecases/ScanLibraryUseCase';
 import type { ScanProgress } from '@/infrastructure/filesystem/MediaScanner';
