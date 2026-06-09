@@ -13,6 +13,10 @@ interface SettingsStore {
   gaplessPlayback: boolean;
   showAlbumArtBackground: boolean;
 
+  // When on, the player does NOT yield audio focus, so music keeps playing over
+  // calls/meetings (Meet, Zoom…) instead of pausing. Read at player setup.
+  playDuringMeetings: boolean;
+
   // Equalizer persistence (opt-in). When on, the EQ enable state + band gains
   // are remembered and re-applied across app restarts.
   persistEqualizer: boolean;
@@ -26,6 +30,7 @@ interface SettingsStore {
   setDefaultSpeed: (speed: PlaybackSpeed) => void;
   setGaplessPlayback: (enabled: boolean) => void;
   setShowAlbumArtBackground: (show: boolean) => void;
+  setPlayDuringMeetings: (enabled: boolean) => void;
   setPersistEqualizer: (enabled: boolean) => void;
   setEqualizerState: (state: { enabled: boolean; preset: string; gains: number[] }) => void;
 }
@@ -39,6 +44,7 @@ export const useSettingsStore = create<SettingsStore>()(
       defaultSpeed: 1.0,
       gaplessPlayback: true,
       showAlbumArtBackground: true,
+      playDuringMeetings: false,
       persistEqualizer: false,
       equalizerEnabled: false,
       equalizerPreset: 'flat',
@@ -50,6 +56,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setDefaultSpeed: (defaultSpeed) => set({ defaultSpeed }),
       setGaplessPlayback: (gaplessPlayback) => set({ gaplessPlayback }),
       setShowAlbumArtBackground: (showAlbumArtBackground) => set({ showAlbumArtBackground }),
+      setPlayDuringMeetings: (playDuringMeetings) => set({ playDuringMeetings }),
       setPersistEqualizer: (persistEqualizer) => set({ persistEqualizer }),
       setEqualizerState: ({ enabled, preset, gains }) =>
         set({ equalizerEnabled: enabled, equalizerPreset: preset, equalizerGains: gains }),
