@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView, Alert, Switch } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { palette } from '@/design-system/tokens/colors';
@@ -27,6 +28,7 @@ interface SongOptionsModalProps {
 }
 
 export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSongHidden }: SongOptionsModalProps) {
+  const insets = useSafeAreaInsets();
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showArtworkPicker, setShowArtworkPicker] = useState(false);
@@ -107,10 +109,10 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: palette.surface0 }}>
+      <View style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}>
        <ResponsivePane>
         {/* Song header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 28, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
           <ExpoImage
             source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
             style={{ width: 52, height: 52, borderRadius: 10 }}

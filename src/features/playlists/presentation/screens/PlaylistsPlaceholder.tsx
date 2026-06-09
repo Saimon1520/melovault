@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, Modal, TextInput,
   Switch, FlatList, Alert, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
@@ -24,6 +24,7 @@ function PlaylistFormModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState(existing?.name ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [keepPosition, setKeepPosition] = useState(existing?.keepPosition ?? false);
@@ -49,7 +50,7 @@ function PlaylistFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: palette.surface0, padding: 24, paddingTop: 40 }}>
+      <View style={{ flex: 1, backgroundColor: palette.surface0, padding: 24, paddingTop: insets.top + 16 }}>
         <ResponsivePane maxWidth={560} style={{ flex: 0 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <Text style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}>

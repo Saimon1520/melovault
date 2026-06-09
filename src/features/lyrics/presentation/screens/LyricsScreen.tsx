@@ -6,6 +6,7 @@ import {
 import { useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { LRCLibService } from '@/infrastructure/lyrics/LRCLibService';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
@@ -14,6 +15,7 @@ import { usePlayerProgress } from '@/features/player/presentation/hooks/usePlaye
 const repo = new SongRepository();
 
 export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { position } = usePlayerProgress();
   const [lyrics, setLyrics] = useState<string>('');
@@ -87,7 +89,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: palette.surface0 }}
+      style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}
     >
       <ResponsivePane maxWidth={680}>
       {/* Header */}

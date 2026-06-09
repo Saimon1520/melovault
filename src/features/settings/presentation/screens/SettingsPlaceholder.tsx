@@ -17,7 +17,19 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function SettingRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
+function SettingRow({ label, description, children, stacked }: { label: string; description?: string; children: React.ReactNode; stacked?: boolean }) {
+  // `stacked` puts the control on its own row below the label — used for chip
+  // selectors so the chips get the full width and don't get squeezed / wrap
+  // awkwardly next to the label (especially in portrait).
+  if (stacked) {
+    return (
+      <View style={{ paddingHorizontal: 20, paddingVertical: 14, backgroundColor: palette.surface1 }}>
+        <Text style={{ color: palette.textPrimary, fontSize: 15 }}>{label}</Text>
+        {description && <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>{description}</Text>}
+        <View style={{ marginTop: 12 }}>{children}</View>
+      </View>
+    );
+  }
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: palette.surface1 }}>
       <View style={{ flex: 1, marginRight: 12 }}>
@@ -82,7 +94,7 @@ export function SettingsPlaceholder() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         <SectionHeader title="REPRODUCCIÓN" />
         <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
-          <SettingRow label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">
+          <SettingRow stacked label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">
             <ChipSelector
               options={[...SEEK_SECONDS_OPTIONS]}
               value={seekSeconds}
@@ -91,7 +103,7 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow label="Velocidad predeterminada">
+          <SettingRow stacked label="Velocidad predeterminada">
             <ChipSelector
               options={SPEEDS}
               value={defaultSpeed}
@@ -108,7 +120,7 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow label="Crossfade" description="Mezcla el final de una canción con el inicio de la siguiente">
+          <SettingRow stacked label="Crossfade" description="Mezcla el final de una canción con el inicio de la siguiente">
             <ChipSelector
               options={[0, 2000, 4000, 6000, 8000, 10000, 12000]}
               value={crossfadeMs}
