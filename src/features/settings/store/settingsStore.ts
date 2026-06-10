@@ -17,6 +17,10 @@ interface SettingsStore {
   // calls/meetings (Meet, Zoom…) instead of pausing. Read at player setup.
   playDuringMeetings: boolean;
 
+  // What to do when another app briefly takes audio (e.g. a notification):
+  // 'pause' fully pauses & resumes (default); 'duck' just lowers the volume.
+  interruptionMode: 'pause' | 'duck';
+
   // Equalizer persistence (opt-in). When on, the EQ enable state + band gains
   // are remembered and re-applied across app restarts.
   persistEqualizer: boolean;
@@ -31,6 +35,7 @@ interface SettingsStore {
   setGaplessPlayback: (enabled: boolean) => void;
   setShowAlbumArtBackground: (show: boolean) => void;
   setPlayDuringMeetings: (enabled: boolean) => void;
+  setInterruptionMode: (mode: 'pause' | 'duck') => void;
   setPersistEqualizer: (enabled: boolean) => void;
   setEqualizerState: (state: { enabled: boolean; preset: string; gains: number[] }) => void;
 }
@@ -45,6 +50,7 @@ export const useSettingsStore = create<SettingsStore>()(
       gaplessPlayback: true,
       showAlbumArtBackground: true,
       playDuringMeetings: false,
+      interruptionMode: 'pause',
       persistEqualizer: false,
       equalizerEnabled: false,
       equalizerPreset: 'flat',
@@ -57,6 +63,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setGaplessPlayback: (gaplessPlayback) => set({ gaplessPlayback }),
       setShowAlbumArtBackground: (showAlbumArtBackground) => set({ showAlbumArtBackground }),
       setPlayDuringMeetings: (playDuringMeetings) => set({ playDuringMeetings }),
+      setInterruptionMode: (interruptionMode) => set({ interruptionMode }),
       setPersistEqualizer: (persistEqualizer) => set({ persistEqualizer }),
       setEqualizerState: ({ enabled, preset, gains }) =>
         set({ equalizerEnabled: enabled, equalizerPreset: preset, equalizerGains: gains }),

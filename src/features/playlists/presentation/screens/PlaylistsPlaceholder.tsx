@@ -9,7 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { PlaylistDetailScreen } from './PlaylistDetailScreen';
+import { FavoritesScreen } from './FavoritesScreen';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
+import { useFavoritesStore } from '@/features/player/store/favoritesStore';
 import type { Playlist } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -170,6 +172,8 @@ export function PlaylistsPlaceholder() {
   const [showForm, setShowForm] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | undefined>();
   const [openPlaylist, setOpenPlaylist] = useState<Playlist | null>(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const favoritesCount = useFavoritesStore(s => s.favoriteIds.length);
 
   const loadPlaylists = useCallback(async () => {
     setPlaylists(await repo.getAll());
@@ -205,13 +209,30 @@ export function PlaylistsPlaceholder() {
         </TouchableOpacity>
       </View>
 
-      {playlists.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <Ionicons name="list" size={48} color={palette.accentSoft} />
-          <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>
-            Sin playlists aún
+      {/* Default, always-present Favoritos playlist (driven by the heart) */}
+      <TouchableOpacity
+        onPress={() => setShowFavorites(true)}
+        style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Favoritos, ${favoritesCount} canciones`}
+      >
+        <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: palette.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="heart" size={26} color={palette.accent} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={{ color: palette.textPrimary, fontWeight: '600', fontSize: 16 }}>Favoritos</Text>
+          <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: 3 }}>
+            {favoritesCount} {favoritesCount === 1 ? 'canción' : 'canciones'}
           </Text>
-          <Text style={{ color: palette.textMuted, fontSize: 14, textAlign: 'center', marginTop: 8 }}>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+      </TouchableOpacity>
+      <View style={{ height: 1, marginLeft: 86, marginBottom: 4, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+
+      {playlists.length === 0 ? (
+        <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 48 }}>
+          <Ionicons name="list" size={44} color={palette.accentSoft} />
+          <Text style={{ color: palette.textMuted, fontSize: 14, textAlign: 'center', marginTop: 12 }}>
             Crea tu primera playlist con el botón +
           </Text>
         </View>
@@ -238,6 +259,8 @@ export function PlaylistsPlaceholder() {
         onClose={() => setShowForm(false)}
         onSave={loadPlaylists}
       />
+
+      <FavoritesScreen visible={showFavorites} onClose={() => setShowFavorites(false)} />
 
       <PlaylistDetailScreen
         playlist={openPlaylist}

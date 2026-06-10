@@ -19,6 +19,7 @@ import { usePositionMemoryStore } from '@/features/player/store/positionMemorySt
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { shuffle } from '@/shared/utils/shuffle';
 import { shouldRememberPosition } from '@/features/player/domain/usecases/positionPolicy';
+import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { ArchivedSongsModal } from './ArchivedSongsModal';
 import type { Song, SortOrder } from '@/shared/types';
 
@@ -110,7 +111,12 @@ export function LibraryPlaceholder() {
 
   const handleScan = useCallback(async () => {
     const result = await startScan();
-    if (result?.success) loadSongs();
+    if (result?.success) {
+      loadSongs();
+      // Bulk-download lyrics for the whole library in the background so the user
+      // doesn't have to fetch them one by one. Idempotent — only new/missing ones.
+      prefetchLyrics();
+    }
   }, [startScan, loadSongs]);
 
   // Play `song` queueing from `list` (the currently visible set: the full

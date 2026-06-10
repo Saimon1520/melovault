@@ -28,6 +28,10 @@ export function ProgressSlider() {
   };
 
   const pan = Gesture.Pan()
+    // Claim horizontal drags so the surrounding vertical ScrollView doesn't
+    // steal the seek gesture.
+    .activeOffsetX([-8, 8])
+    .failOffsetY([-18, 18])
     .onBegin(() => {
       thumbScale.value = withSpring(1.5, { damping: 15, stiffness: 300 });
       isSeeking.value = true;

@@ -12,6 +12,7 @@ import { ArtworkPicker } from '@/features/library/presentation/components/Artwor
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { usePositionMemoryStore } from '@/features/player/store/positionMemoryStore';
 import { useArchiveStore } from '@/features/library/store/archiveStore';
+import { useFavoritesStore } from '@/features/player/store/favoritesStore';
 import type { Song, Playlist } from '@/shared/types';
 import { formatTime, formatFileSize } from '@/shared/utils/formatTime';
 
@@ -106,6 +107,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
     ? Object.entries(song.extraMetadata).filter(([, v]) => v && v.trim() !== '')
     : [];
   const songArchived = useArchiveStore.getState().isArchived(song);
+  const songFavorite = useFavoritesStore.getState().isFavorite(song.id);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -151,6 +153,9 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
 
           {/* Main actions */}
           {[
+            songFavorite
+              ? { icon: 'heart' as const, label: 'Quitar de favoritos', onPress: () => { useFavoritesStore.getState().toggleFavorite(song.id); onClose(); }, color: palette.accent }
+              : { icon: 'heart-outline' as const, label: 'Agregar a favoritos', onPress: () => { useFavoritesStore.getState().toggleFavorite(song.id); onClose(); } },
             { icon: 'play-forward-outline' as const, label: 'Agregar a la cola', onPress: async () => { await TrackPlayerService.getInstance().addToQueue(song); onClose(); } },
             { icon: 'list-outline' as const, label: 'Agregar a playlist', onPress: () => setShowPlaylists(v => !v) },
             { icon: 'image-outline' as const, label: 'Cambiar portada', onPress: () => setShowArtworkPicker(true) },
