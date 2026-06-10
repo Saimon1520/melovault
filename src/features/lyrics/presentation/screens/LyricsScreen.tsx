@@ -121,16 +121,36 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
 
   const posMs = position * 1000;
   const activeLineIndex = syncedLines.findLastIndex(l => l.timeMs <= posMs - offset);
+  const activeLineIndexRef = useRef(-1);
+  activeLineIndexRef.current = activeLineIndex;
+
+  const scrollToLine = (idx: number, animated: boolean) => {
+    const y = idx >= 0 ? lineYs.current[idx] : null;
+    if (y == null || viewportH.current <= 0) return false;
+    lastScrolledLine.current = idx;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - viewportH.current * 0.42), animated });
+    return true;
+  };
 
   // Center the active line using the measured offsets (reliable even when lines
   // wrap to multiple rows — fixed-height math would drift).
   useEffect(() => {
     if (activeLineIndex < 0 || activeLineIndex === lastScrolledLine.current) return;
-    const y = lineYs.current[activeLineIndex];
-    if (y == null) return;
-    lastScrolledLine.current = activeLineIndex;
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - viewportH.current * 0.42), animated: true });
+    scrollToLine(activeLineIndex, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLineIndex]);
+
+  // When synced lyrics first appear (modal opened), jump straight to where the
+  // song already is — the line heights are measured asynchronously, so retry
+  // until they're ready, then snap (no animation) to the current line.
+  useEffect(() => {
+    if (syncedLines.length === 0) return;
+    let tries = 0;
+    const id = setInterval(() => {
+      if (scrollToLine(activeLineIndexRef.current, false) || ++tries > 15) clearInterval(id);
+    }, 80);
+    return () => clearInterval(id);
+  }, [syncedLines]);
 
   const handleSaveEdit = async () => {
     setSyncedLines([]);
