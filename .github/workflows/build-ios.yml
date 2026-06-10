@@ -1,9 +1,7 @@
 name: Build iOS IPA (EAS)
 
+# Manual-only (needs an EXPO_TOKEN secret). Was failing on every pushed tag.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
