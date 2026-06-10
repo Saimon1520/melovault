@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, NativeModules } from 'react-native';
+import { View, ActivityIndicator, NativeModules, AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
-import { restoreLastSession, startPositionPersistence } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { restoreLastSession, startPositionPersistence, savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { OnboardingScreen } from '@/features/onboarding/presentation/screens/OnboardingScreen';
@@ -60,6 +60,16 @@ export function Providers({ children }: ProvidersProps) {
     };
 
     init();
+  }, []);
+
+  // Save the exact playback position the moment the app leaves the foreground
+  // (home, app switch, swipe-close) so a song with position memory reopens
+  // precisely where it was, not at the last periodic checkpoint.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') savePositionNow(true);
+    });
+    return () => sub.remove();
   }, []);
 
   const handleOnboardingComplete = async () => {

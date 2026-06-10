@@ -26,37 +26,44 @@ export function invalidateRememberCache(): void {
   rememberCache = null;
 }
 
-// Saves current position every N ms while playing
-const SAVE_INTERVAL_MS = 5000;
-
+const SAVE_INTERVAL_MS = 2000;   // foreground periodic backup
+const SAVE_THROTTLE_MS = 1200;   // de-dupe the multiple triggers
 let saveIntervalId: ReturnType<typeof setInterval> | null = null;
+let lastSaveAt = 0;
+
+// Persist the CURRENT position immediately. Called periodically (interval +
+// playback-progress event, which keeps firing in the background) and, with
+// `force`, the instant the app goes to the background/closes — so reopening
+// resumes at the exact second instead of the last 5s checkpoint.
+export async function savePositionNow(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - lastSaveAt < SAVE_THROTTLE_MS) return;
+  try {
+    const position = await TrackPlayer.getPosition();
+    const track = await TrackPlayer.getActiveTrack();
+    if (track?.id == null) return;
+    lastSaveAt = now;
+
+    const remember = await remembersFor(track.id as string);
+    const positionMs = Math.round(position * 1000); // getPosition() is seconds
+    if (remember) {
+      await repos().songRepo.updateLastPosition(track.id as string, positionMs);
+    }
+    await repos().playerStateRepo.save({
+      currentTrackId: track.id as string,
+      position: remember ? positionMs : 0,
+      queueIndex: await TrackPlayer.getActiveTrackIndex() ?? 0,
+    });
+  } catch {
+    // Silently ignore persistence errors — they should not affect playback
+  }
+}
 
 export async function startPositionPersistence(): Promise<void> {
   stopPositionPersistence();
-
   saveIntervalId = setInterval(async () => {
-    try {
-      const { state } = await TrackPlayer.getPlaybackState();
-      if (state !== State.Playing) return;
-
-      const position = await TrackPlayer.getPosition();
-      const track = await TrackPlayer.getActiveTrack();
-      if (!track?.id) return;
-
-      const remember = await remembersFor(track.id as string);
-      // getPosition() is in seconds; we persist milliseconds everywhere.
-      const positionMs = Math.round(position * 1000);
-      if (remember) {
-        await repos().songRepo.updateLastPosition(track.id as string, positionMs);
-      }
-      await repos().playerStateRepo.save({
-        currentTrackId: track.id as string,
-        position: remember ? positionMs : 0,
-        queueIndex: await TrackPlayer.getActiveTrackIndex() ?? 0,
-      });
-    } catch {
-      // Silently ignore persistence errors — they should not affect playback
-    }
+    const { state } = await TrackPlayer.getPlaybackState();
+    if (state === State.Playing) savePositionNow();
   }, SAVE_INTERVAL_MS);
 }
 
