@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { LRCLibService } from '@/infrastructure/lyrics/LRCLibService';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
+import { useLyricsOffsetStore } from '@/features/lyrics/store/lyricsOffsetStore';
 import { usePlayerProgress } from '@/features/player/presentation/hooks/usePlayerControls';
 
 const repo = new SongRepository();
@@ -18,24 +19,28 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { position } = usePlayerProgress();
+  // The `songId` prop is captured when the player opens and goes stale once the
+  // queue advances — always trust the live active track id so the lyrics match
+  // the song that's actually playing.
+  const sid = activeTrack?.id != null ? String(activeTrack.id) : songId;
   const [lyrics, setLyrics] = useState<string>('');
   const [syncedLines, setSyncedLines] = useState<Array<{ timeMs: number; text: string }>>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [offsetText, setOffsetText] = useState('');
+  const offsetFocused = useRef(false);
+
   const scrollRef = useRef<ScrollView>(null);
-  const activeLineRef = useRef<number>(-1);
+  const lineYs = useRef<number[]>([]);          // measured Y of each synced line
+  const viewportH = useRef(0);                   // height of the scroll viewport
+  const lastScrolledLine = useRef<number>(-1);
 
-  useEffect(() => {
+  // `background` upgrades plain → synced without showing the spinner (keeps the
+  // already-visible lyrics in place until/unless synced ones arrive).
+  const fetchFromLRCLib = useCallback(async (silent = false, background = false) => {
     if (!activeTrack) return;
-    // Load lyrics from DB if we have a songId
-    setLyrics('');
-    setSyncedLines([]);
-  }, [activeTrack?.id]);
-
-  const fetchFromLRCLib = useCallback(async () => {
-    if (!activeTrack) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     try {
       const result = await LRCLibService.searchLyrics(
         activeTrack.title ?? '',
@@ -44,16 +49,14 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
         activeTrack.duration,
       );
       if (result?.syncedLyrics) {
-        const lines = LRCLibService.parseLRC(result.syncedLyrics);
-        setSyncedLines(lines);
+        setSyncedLines(LRCLibService.parseLRC(result.syncedLyrics));
         setLyrics(result.syncedLyrics);
-        if (songId) await repo.updateLyrics(songId, result.plainLyrics ?? '', result.syncedLyrics);
+        if (sid) await repo.updateLyrics(sid, result.plainLyrics ?? '', result.syncedLyrics);
       } else if (result?.plainLyrics) {
+        setSyncedLines([]);
         setLyrics(result.plainLyrics);
-        if (songId) await repo.updateLyrics(songId, result.plainLyrics);
-      } else {
-        // Keep the empty state (with the write/paste action) and let the user
-        // know, instead of overwriting the view with an error string.
+        if (sid) await repo.updateLyrics(sid, result.plainLyrics);
+      } else if (!silent) {
         Alert.alert(
           'Sin resultados',
           'No se encontraron letras online. Puedes pegarlas tú mismo (por ejemplo, copiadas de tu navegador).',
@@ -64,26 +67,76 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
         );
       }
     } catch {
-      Alert.alert('Error', 'No se pudo buscar letras. Revisa tu conexión.');
+      if (!silent) Alert.alert('Error', 'No se pudo buscar letras. Revisa tu conexión.');
     }
-    setLoading(false);
-  }, [activeTrack, songId]);
+    if (!background) setLoading(false);
+  }, [activeTrack, sid]);
 
-  // Auto-scroll to active lyric line
-  const posMs = position * 1000;
-  const activeLineIndex = syncedLines.findLastIndex(l => l.timeMs <= posMs);
-
+  // On open / track change: show saved lyrics instantly; otherwise fetch once.
   useEffect(() => {
-    if (activeLineIndex !== activeLineRef.current && activeLineIndex >= 0) {
-      activeLineRef.current = activeLineIndex;
-      scrollRef.current?.scrollTo({ y: activeLineIndex * 44 - 100, animated: true });
-    }
+    let active = true;
+    setIsEditing(false);
+    lineYs.current = [];
+    lastScrolledLine.current = -1;
+    (async () => {
+      const song = sid ? await repo.getById(sid) : null;
+      if (!active) return;
+      if (song?.lyricsSynced) {
+        setSyncedLines(LRCLibService.parseLRC(song.lyricsSynced));
+        setLyrics(song.lyricsSynced);
+      } else if (song?.lyrics) {
+        setSyncedLines([]);
+        setLyrics(song.lyrics);
+        // We only have plain lyrics saved — try to upgrade to synced (karaoke)
+        // in the background without disturbing the current view.
+        if (activeTrack) fetchFromLRCLib(true, true);
+      } else {
+        setSyncedLines([]);
+        setLyrics('');
+        if (activeTrack) fetchFromLRCLib(true); // silent auto-fetch
+      }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sid]);
+
+  // Karaoke: which line corresponds to the current playback position, shifted by
+  // the user's manual sync offset (online LRC is timed for another version).
+  const offset = useLyricsOffsetStore(s => (sid ? s.offsets[sid] ?? 0 : 0));
+  const setOffset = useLyricsOffsetStore(s => s.setOffset);
+  // Offset is a positive delay only (seconds the lyrics start later than the LRC).
+  const applyOffset = (ms: number) => { if (sid) setOffset(sid, Math.max(0, Math.round(ms))); };
+  const bumpOffset = (deltaMs: number) => applyOffset(offset + deltaMs);
+  const resetOffset = () => { applyOffset(0); setOffsetText(''); };
+  const commitOffsetText = (t: string) => {
+    const cleaned = t.replace(',', '.').replace(/[^0-9.]/g, ''); // digits + dot, no sign
+    setOffsetText(cleaned);
+    const n = parseFloat(cleaned);
+    if (Number.isFinite(n)) applyOffset(n * 1000);
+  };
+  // Keep the field in sync when the +/- buttons change the offset (not while typing).
+  useEffect(() => {
+    if (!offsetFocused.current) setOffsetText(offset ? (offset / 1000).toString() : '');
+  }, [offset]);
+
+  const posMs = position * 1000;
+  const activeLineIndex = syncedLines.findLastIndex(l => l.timeMs <= posMs - offset);
+
+  // Center the active line using the measured offsets (reliable even when lines
+  // wrap to multiple rows — fixed-height math would drift).
+  useEffect(() => {
+    if (activeLineIndex < 0 || activeLineIndex === lastScrolledLine.current) return;
+    const y = lineYs.current[activeLineIndex];
+    if (y == null) return;
+    lastScrolledLine.current = activeLineIndex;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - viewportH.current * 0.42), animated: true });
   }, [activeLineIndex]);
 
   const handleSaveEdit = async () => {
+    setSyncedLines([]);
     setLyrics(editText);
     setIsEditing(false);
-    if (songId) await repo.updateLyrics(songId, editText);
+    if (sid) await repo.updateLyrics(sid, editText);
   };
 
   return (
@@ -102,12 +155,12 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
             {activeTrack?.title ?? 'Letras'}
           </Text>
           <Text style={{ color: palette.textMuted, fontSize: 12 }} numberOfLines={1}>
-            {activeTrack?.artist}
+            {activeTrack?.artist}{syncedLines.length > 0 ? '  •  Sincronizada' : ''}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 4 }}>
           <TouchableOpacity
-            onPress={fetchFromLRCLib}
+            onPress={() => fetchFromLRCLib(false)}
             style={{ padding: 8 }}
             accessibilityRole="button" accessibilityLabel="Buscar letras online"
           >
@@ -146,26 +199,38 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
           placeholderTextColor={palette.textMuted}
         />
       ) : syncedLines.length > 0 ? (
-        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 24, paddingBottom: 80 }}>
-          {syncedLines.map((line, i) => (
-            <Text
-              key={i}
-              style={{
-                color: i === activeLineIndex ? palette.textPrimary : palette.textMuted,
-                fontSize: i === activeLineIndex ? 20 : 17,
-                fontWeight: i === activeLineIndex ? '700' : '400',
-                lineHeight: 44,
-                textAlign: 'center',
-                transform: [{ scale: i === activeLineIndex ? 1.05 : 1 }],
-              }}
-            >
-              {line.text}
-            </Text>
-          ))}
+        <ScrollView
+          ref={scrollRef}
+          onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; }}
+          contentContainerStyle={{ paddingVertical: 24, paddingHorizontal: 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {syncedLines.map((line, i) => {
+            const dist = Math.abs(i - activeLineIndex);
+            const isActive = i === activeLineIndex;
+            return (
+              <Text
+                key={i}
+                onLayout={(e) => { lineYs.current[i] = e.nativeEvent.layout.y; }}
+                style={{
+                  color: isActive ? '#fff' : palette.textMuted,
+                  opacity: isActive ? 1 : dist === 1 ? 0.6 : dist === 2 ? 0.4 : 0.28,
+                  fontSize: isActive ? 24 : 19,
+                  fontWeight: isActive ? '800' : '500',
+                  lineHeight: isActive ? 34 : 30,
+                  textAlign: 'center',
+                  marginVertical: 8,
+                }}
+              >
+                {line.text}
+              </Text>
+            );
+          })}
+          <View style={{ height: 120 }} />
         </ScrollView>
       ) : lyrics ? (
         <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 80 }}>
-          <Text style={{ color: palette.textSecondary, fontSize: 17, lineHeight: 30, textAlign: 'center' }}>
+          <Text style={{ color: palette.textSecondary, fontSize: 18, lineHeight: 32, textAlign: 'center' }}>
             {lyrics}
           </Text>
         </ScrollView>
@@ -178,7 +243,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
           </Text>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
             <TouchableOpacity
-              onPress={fetchFromLRCLib}
+              onPress={() => fetchFromLRCLib(false)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, backgroundColor: palette.accent, borderRadius: 24 }}
               accessibilityRole="button"
             >
@@ -194,6 +259,50 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
               <Text style={{ color: palette.textSecondary, fontWeight: '600' }}>Escribir/Pegar</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+
+      {/* Manual karaoke sync offset (per song, positive delay only) */}
+      {syncedLines.length > 0 && !isEditing && !loading && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+          <Ionicons name="sync-outline" size={16} color={palette.textMuted} />
+          <TouchableOpacity
+            onPress={() => bumpOffset(-500)}
+            onLongPress={() => bumpOffset(-5000)}
+            style={{ width: 38, height: 34, borderRadius: 8, backgroundColor: palette.surface2, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel="Restar 0.5 segundos"
+          >
+            <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>−</Text>
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surface2, borderRadius: 8, paddingHorizontal: 8, height: 34 }}>
+            <TextInput
+              value={offsetText}
+              onChangeText={commitOffsetText}
+              onFocus={() => { offsetFocused.current = true; }}
+              onBlur={() => { offsetFocused.current = false; setOffsetText(offset ? (offset / 1000).toString() : ''); }}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={palette.textMuted}
+              style={{ color: offset === 0 ? palette.textMuted : palette.accent, fontSize: 15, fontWeight: '700', minWidth: 38, textAlign: 'center', padding: 0 }}
+            />
+            <Text style={{ color: palette.textMuted, fontSize: 13 }}>s</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => bumpOffset(500)}
+            onLongPress={() => bumpOffset(5000)}
+            style={{ width: 38, height: 34, borderRadius: 8, backgroundColor: palette.surface2, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel="Sumar 0.5 segundos"
+          >
+            <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>＋</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={resetOffset}
+            disabled={offset === 0}
+            style={{ width: 38, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel="Reiniciar sincronía"
+          >
+            <Ionicons name="refresh" size={18} color={offset === 0 ? palette.surface3 : palette.textSecondary} />
+          </TouchableOpacity>
         </View>
       )}
       </ResponsivePane>

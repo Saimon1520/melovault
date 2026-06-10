@@ -72,6 +72,7 @@ export function SettingsPlaceholder() {
     gaplessPlayback, setGaplessPlayback,
     defaultSpeed, setDefaultSpeed,
     playDuringMeetings, setPlayDuringMeetings,
+    interruptionMode, setInterruptionMode,
   } = useSettingsStore();
 
   const toggleMeetings = (value: boolean) => {
@@ -126,6 +127,15 @@ export function SettingsPlaceholder() {
               value={crossfadeMs}
               onChange={setCrossfadeMs}
               format={v => v === 0 ? 'Off' : `${v / 1000}s`}
+            />
+          </SettingRow>
+          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <SettingRow stacked label="Al sonar una notificación" description="Qué hacer cuando otra app reproduce un sonido. Aplica al reiniciar.">
+            <ChipSelector
+              options={['pause', 'duck'] as const}
+              value={interruptionMode}
+              onChange={setInterruptionMode}
+              format={v => (v === 'pause' ? 'Pausar' : 'Atenuar')}
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />

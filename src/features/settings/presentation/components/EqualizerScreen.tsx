@@ -33,37 +33,48 @@ const GAIN_MIN = -12;
 const GAIN_MAX = 12;
 const SLIDER_HEIGHT = 160;
 
+const HIT_WIDTH = 48;
+
 function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: number) => void }) {
   const gainToY = (g: number) => ((GAIN_MAX - g) / (GAIN_MAX - GAIN_MIN)) * SLIDER_HEIGHT;
   const position = useSharedValue(gainToY(band.gain));
 
-  const gesture = Gesture.Pan()
-    .onUpdate(e => {
-      const newY = Math.max(0, Math.min(SLIDER_HEIGHT, position.value + e.changeY));
-      position.value = newY;
-      const gain = GAIN_MAX - (newY / SLIDER_HEIGHT) * (GAIN_MAX - GAIN_MIN);
-      runOnJS(onChange)(Math.round(gain));
-    });
+  // Keep the thumb in sync when the gain changes from outside (presets/reset).
+  React.useEffect(() => { position.value = gainToY(band.gain); }, [band.gain]);
 
-  const thumbStyle = useAnimatedStyle(() => ({
-    top: position.value - 12,
-  }));
+  // Drive the gain from the absolute touch Y (reliable — no delta drift), with a
+  // 48px-wide hit area so the thin track is easy to grab.
+  const setFromY = (y: number) => {
+    'worklet';
+    const clamped = Math.max(0, Math.min(SLIDER_HEIGHT, y));
+    position.value = clamped;
+    const gain = GAIN_MAX - (clamped / SLIDER_HEIGHT) * (GAIN_MAX - GAIN_MIN);
+    runOnJS(onChange)(Math.round(gain));
+  };
 
-  const fillStyle = useAnimatedStyle(() => ({
-    height: SLIDER_HEIGHT - position.value,
-    bottom: 0,
-  }));
+  const pan = Gesture.Pan().minDistance(0)
+    .onBegin(e => setFromY(e.y))
+    .onUpdate(e => setFromY(e.y));
+  const tap = Gesture.Tap().onBegin(e => setFromY(e.y));
+  const gesture = Gesture.Race(pan, tap);
+
+  const thumbStyle = useAnimatedStyle(() => ({ top: position.value - 12 }));
+  const fillStyle = useAnimatedStyle(() => ({ height: SLIDER_HEIGHT - position.value }));
 
   return (
-    <View style={{ alignItems: 'center', width: 44 }}>
+    <View style={{ alignItems: 'center', width: HIT_WIDTH }}>
       <Text style={{ color: palette.textMuted, fontSize: 11, marginBottom: 6, minHeight: 18 }}>
         {band.gain > 0 ? `+${band.gain}` : band.gain}
       </Text>
       <GestureDetector gesture={gesture}>
-        <View style={{ width: 4, height: SLIDER_HEIGHT, backgroundColor: palette.surface3, borderRadius: 2, position: 'relative' }}>
-          <Animated.View style={[fillStyle, { position: 'absolute', left: 0, right: 0, backgroundColor: palette.accent, borderRadius: 2 }]} />
+        <View style={{ width: HIT_WIDTH, height: SLIDER_HEIGHT, alignItems: 'center', justifyContent: 'flex-start' }}>
+          {/* track */}
+          <View style={{ position: 'absolute', top: 0, left: HIT_WIDTH / 2 - 2, width: 4, height: SLIDER_HEIGHT, backgroundColor: palette.surface3, borderRadius: 2 }}>
+            <Animated.View style={[fillStyle, { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: palette.accent, borderRadius: 2 }]} />
+          </View>
+          {/* thumb */}
           <Animated.View style={[thumbStyle, {
-            position: 'absolute', left: -10, width: 24, height: 24,
+            position: 'absolute', left: HIT_WIDTH / 2 - 12, width: 24, height: 24,
             borderRadius: 12, backgroundColor: '#fff',
             shadowColor: palette.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 4,
           }]} />
@@ -88,6 +99,12 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
   );
   const [enabled, setEnabled] = useState(persistEqualizer ? equalizerEnabled : false);
   const [available, setAvailable] = useState(true);
+  // The user's last hand-tuned band set, selectable via the "Personalizado" chip.
+  const [customBands, setCustomBands] = useState<EqualizerBand[]>(
+    persistEqualizer && equalizerPreset === 'custom' && equalizerGains.length === 5
+      ? DEFAULT_PRESETS[0]!.bands.map((b, i) => ({ ...b, gain: equalizerGains[i] ?? 0 }))
+      : DEFAULT_PRESETS[0]!.bands,
+  );
 
   // Persist the current EQ state when the user opted in.
   const save = useCallback((nextEnabled: boolean, preset: string, nextBands: EqualizerBand[]) => {
@@ -140,10 +157,19 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
   const updateBand = (index: number, gain: number) => {
     const next = bands.map((b, i) => i === index ? { ...b, gain } : b);
     setBands(next);
+    setCustomBands(next); // remember the hand-tuned set
     setSelectedPreset('custom');
     if (!enabled) { setEnabled(true); AudioControl?.setEqEnabled(true); }
     AudioControl?.setBandLevel(index, Math.round(gain * 100));
     save(true, 'custom', next);
+  };
+
+  const applyCustom = () => {
+    setSelectedPreset('custom');
+    setBands(customBands);
+    if (!enabled) { setEnabled(true); AudioControl?.setEqEnabled(true); }
+    pushGains(customBands);
+    save(true, 'custom', customBands);
   };
 
   const togglePersist = useCallback((value: boolean) => {
@@ -179,6 +205,21 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
         style={{ flexGrow: 0, maxHeight: 56 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8, alignItems: 'center' }}
       >
+        <TouchableOpacity
+          onPress={applyCustom}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 5,
+            paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, height: 36,
+            backgroundColor: selectedPreset === 'custom' ? palette.accentSoft : palette.surface2,
+            borderWidth: 1, borderColor: selectedPreset === 'custom' ? palette.accent : 'transparent',
+          }}
+          accessibilityRole="button" accessibilityLabel="Personalizado"
+        >
+          <Ionicons name="options-outline" size={14} color={selectedPreset === 'custom' ? palette.accent : palette.textSecondary} />
+          <Text style={{ color: selectedPreset === 'custom' ? palette.accent : palette.textSecondary, fontSize: 13, fontWeight: '500' }}>
+            Personalizado
+          </Text>
+        </TouchableOpacity>
         {DEFAULT_PRESETS.map(preset => (
           <TouchableOpacity
             key={preset.id}

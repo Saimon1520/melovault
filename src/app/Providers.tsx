@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { restoreLastSession, startPositionPersistence } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { OnboardingScreen } from '@/features/onboarding/presentation/screens/OnboardingScreen';
 import { palette } from '@/design-system/tokens/colors';
@@ -48,6 +49,10 @@ export function Providers({ children }: ProvidersProps) {
         await restoreLastSession();
         startPositionPersistence();
         setAppState('ready');
+
+        // Resume the background lyrics download for any songs still missing them
+        // (e.g. if a previous run was interrupted). Delayed + best-effort.
+        setTimeout(() => { prefetchLyrics(); }, 8000);
       } catch (err) {
         console.error('[Providers] init error:', err);
         setAppState('ready');

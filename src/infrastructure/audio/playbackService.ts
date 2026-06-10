@@ -19,27 +19,10 @@ export async function PlaybackService() {
   TrackPlayer.addEventListener(Event.RemotePrevious, () => TrackPlayer.skipToPrevious());
   TrackPlayer.addEventListener(Event.RemoteSeek, (event) => TrackPlayer.seekTo(event.position));
 
-  // ── Headphone / audio device disconnect ──────────────────────────────────
-  // Triggered when:
-  //   • Wired headphones are unplugged (Android ACTION_AUDIO_BECOMING_NOISY)
-  //   • Bluetooth headphones disconnect
-  //   • Another app requests audio focus (phone call, alarm, etc.)
-  // autoHandleInterruptions=true in setupPlayer handles most of this,
-  // but we add explicit pause here for Bluetooth disconnect edge cases.
-  TrackPlayer.addEventListener(Event.RemoteDuck, async (event) => {
-    // When the user opted to keep playing over calls/meetings, ignore focus loss.
-    if (useSettingsStore.getState().playDuringMeetings) return;
-    if (event.permanent) {
-      // Another app permanently took audio (phone call ended, etc.) — stop
-      await TrackPlayer.stop();
-    } else if (event.paused) {
-      // Temporary interruption OR headphone disconnect — pause
-      await TrackPlayer.pause();
-    } else {
-      // Interruption ended — resume (only if we were playing before)
-      await TrackPlayer.play();
-    }
-  });
+  // Audio interruptions (notifications, calls, headphone unplug) are handled
+  // natively via setupPlayer's autoHandleInterruptions + alwaysPauseOnInterruption
+  // (pause/duck + auto-resume), so we deliberately don't handle RemoteDuck here —
+  // doing both caused conflicting pause/resume.
 
   // ── Playback error recovery ───────────────────────────────────────────────
   TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {

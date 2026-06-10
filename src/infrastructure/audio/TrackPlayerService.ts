@@ -8,14 +8,19 @@ import TrackPlayer, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Song, RepeatMode, PlaybackSpeed } from '@/shared/types';
 
-// Read one persisted setting before the zustand store has hydrated (setup runs
-// at startup). Returns false if anything is missing.
-async function readPlayDuringMeetings(): Promise<boolean> {
+// Read persisted settings before the zustand store has hydrated (setup runs at
+// startup). Returns defaults if anything is missing.
+async function readAudioSettings(): Promise<{ playDuringMeetings: boolean; pauseOnInterruption: boolean }> {
   try {
     const raw = await AsyncStorage.getItem('@melovault/settings');
-    return raw ? !!JSON.parse(raw)?.state?.playDuringMeetings : false;
+    const state = raw ? JSON.parse(raw)?.state : null;
+    return {
+      playDuringMeetings: !!state?.playDuringMeetings,
+      // Default to pausing on interruption (notifications/calls) like Spotify.
+      pauseOnInterruption: state?.interruptionMode !== 'duck',
+    };
   } catch {
-    return false;
+    return { playDuringMeetings: false, pauseOnInterruption: true };
   }
 }
 
@@ -33,7 +38,7 @@ export class TrackPlayerService {
     // When "play during meetings" is on we must NOT auto-handle interruptions,
     // because that maps to kotlinaudio's handleAudioFocus — keeping it off means
     // the player never yields focus, so music plays over calls/meetings.
-    const playDuringMeetings = await readPlayDuringMeetings();
+    const { playDuringMeetings, pauseOnInterruption } = await readAudioSettings();
 
     await TrackPlayer.setupPlayer({
       maxCacheSize: 1024 * 5, // 5MB
@@ -47,6 +52,10 @@ export class TrackPlayerService {
       android: {
         // Keep playback alive after app is killed from recents
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
+        // Fully pause (and resume) on a transient interruption like a
+        // notification, instead of just ducking the volume — unless the user
+        // chose "duck" in settings.
+        alwaysPauseOnInterruption: pauseOnInterruption,
       },
 
       // Full set of capabilities — shown in:
