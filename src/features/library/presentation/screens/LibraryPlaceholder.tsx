@@ -95,17 +95,12 @@ export function LibraryPlaceholder() {
 
   const loadSongs = useCallback(async () => {
     setLoading(true);
-    const all = await repoRef.current!.getAll(sortOrder);
-    const q = searchQuery.trim().toLowerCase();
-    setSongs(q
-      ? all.filter(s =>
-          s.title.toLowerCase().includes(q) ||
-          s.artist.toLowerCase().includes(q) ||
-          s.album.toLowerCase().includes(q))
-      : all);
+    // Load everything; the search is applied per-tab at render time (by song
+    // title, album, artist or genre depending on which tab is open).
+    setSongs(await repoRef.current!.getAll(sortOrder));
     playlistRepoRef.current!.getKeepPositionSongIds().then(setKeepPosIds).catch(() => {});
     setLoading(false);
-  }, [sortOrder, searchQuery]);
+  }, [sortOrder]);
 
   useEffect(() => { loadSongs(); }, [loadSongs]);
 
@@ -159,13 +154,23 @@ export function LibraryPlaceholder() {
     [songs, archivedIds, unarchivedIds],
   );
 
-  const groups = useMemo(
-    () => (activeTab === 'songs' ? [] : groupSongs(mainSongs, activeTab)),
-    [mainSongs, activeTab],
-  );
+  const query = searchQuery.trim().toLowerCase();
 
-  // The song list currently shown (main library, or the open group's songs).
-  const visibleSongs = selectedGroup ? selectedGroup.songs : mainSongs;
+  // Group tabs: filter the groups by their own name (album / artist / genre).
+  const groups = useMemo(() => {
+    if (activeTab === 'songs') return [];
+    const g = groupSongs(mainSongs, activeTab);
+    return query ? g.filter(grp => grp.label.toLowerCase().includes(query)) : g;
+  }, [mainSongs, activeTab, query]);
+
+  // Song list: an opened group shows all its songs; the Canciones tab filters by
+  // the song title.
+  const visibleSongs = useMemo(() => {
+    const base = selectedGroup ? selectedGroup.songs : mainSongs;
+    if (!selectedGroup && activeTab !== 'songs') return base; // group tabs use the group list
+    return query ? base.filter(s => s.title.toLowerCase().includes(query)) : base;
+  }, [selectedGroup, activeTab, mainSongs, query]);
+
   const isEmpty = !loading && mainSongs.length === 0 && archivedSongs.length === 0 && !isScanning;
 
   return (
@@ -180,7 +185,13 @@ export function LibraryPlaceholder() {
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Buscar canciones, artistas..."
+              placeholder={
+                selectedGroup ? 'Buscar en este álbum...'
+                : activeTab === 'albums' ? 'Buscar álbumes...'
+                : activeTab === 'artists' ? 'Buscar artistas...'
+                : activeTab === 'genres' ? 'Buscar géneros...'
+                : 'Buscar canciones...'
+              }
               placeholderTextColor={palette.textMuted}
               style={{ flex: 1, color: palette.textPrimary, fontSize: 15, marginLeft: 8 }}
               autoFocus
