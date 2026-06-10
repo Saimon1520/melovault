@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal, useWindowDimensions, NativeModules, ToastAndroid } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   runOnJS, interpolate, Extrapolation,
@@ -43,6 +43,12 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
   const [showBluetooth, setShowBluetooth] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+
+  const copyPath = (path?: string | null) => {
+    if (!path) return;
+    NativeModules.AudioControl?.copyToClipboard?.(path);
+    ToastAndroid.show('Ruta del archivo copiada', ToastAndroid.SHORT);
+  };
 
   const trackId = activeTrack?.id ? String(activeTrack.id) : undefined;
   const favoriteIds = useFavoritesStore(s => s.favoriteIds);
@@ -253,9 +259,16 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
               ] as [string, string | undefined | null][])
                 .filter(([, v]) => v)
                 .map(([label, value]) => (
-                  <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <View key={label} style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                     <Text style={{ color: palette.textMuted, fontSize: 13, marginRight: 12, flexShrink: 0 }}>{label}</Text>
-                    <Text style={{ color: palette.textSecondary, fontSize: 13, flex: 1, textAlign: 'right' }} numberOfLines={2}>{value}</Text>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', gap: 8 }}>
+                      <Text style={{ color: palette.textSecondary, fontSize: 13, flexShrink: 1, textAlign: 'right' }} numberOfLines={label === 'Archivo' ? 4 : 2}>{value}</Text>
+                      {label === 'Archivo' && (
+                        <TouchableOpacity onPress={() => copyPath(value)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Copiar ruta del archivo">
+                          <Ionicons name="copy-outline" size={16} color={palette.accent} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 ))}
             </ScrollView>
