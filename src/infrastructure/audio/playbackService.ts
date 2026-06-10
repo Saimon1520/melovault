@@ -1,5 +1,5 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
-import { savePositionOnTrackChange } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { savePositionOnTrackChange, savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { usePlayerStore } from '@/features/player/store/playerStore';
@@ -60,6 +60,11 @@ export async function PlaybackService() {
   // (fires every `progressUpdateEventInterval` seconds). The next track is
   // faded back in by the track-changed handler above.
   TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (e) => {
+    // Persist the position from here too: this event keeps firing while the app
+    // is in the background (the playback service stays alive), so the saved
+    // position tracks the real playback closely (throttled internally).
+    savePositionNow();
+
     const crossfadeMs = useSettingsStore.getState().crossfadeMs;
     if (crossfadeMs <= 0 || !e.duration) return;
     const remainingMs = (e.duration - e.position) * 1000;
