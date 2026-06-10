@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, Alert, Switch, NativeModules, ToastAndroid } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
@@ -219,9 +219,20 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
                 ['Archivo', song.filePath],
                 ...extraFields,
               ].filter(([, v]) => v).map(([label, value]) => (
-                <View key={label as string} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <View key={label as string} style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text style={{ color: palette.textMuted, fontSize: 13, flexShrink: 0, marginRight: 8 }}>{label}</Text>
-                  <Text style={{ color: palette.textSecondary, fontSize: 13, flex: 1, textAlign: 'right' }} numberOfLines={2}>{value}</Text>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', gap: 8 }}>
+                    <Text style={{ color: palette.textSecondary, fontSize: 13, flexShrink: 1, textAlign: 'right' }} numberOfLines={label === 'Archivo' ? 4 : 2}>{value}</Text>
+                    {label === 'Archivo' && (
+                      <TouchableOpacity
+                        onPress={() => { NativeModules.AudioControl?.copyToClipboard?.(String(value)); ToastAndroid.show('Ruta del archivo copiada', ToastAndroid.SHORT); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button" accessibilityLabel="Copiar ruta del archivo"
+                      >
+                        <Ionicons name="copy-outline" size={16} color={palette.accent} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>

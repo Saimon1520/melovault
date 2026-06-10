@@ -1,5 +1,7 @@
 package com.melovault
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioDeviceInfo
@@ -21,6 +23,16 @@ class AudioControlModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
   override fun getName(): String = "AudioControl"
+
+  // ── Clipboard ──────────────────────────────────────────────────────────
+
+  @ReactMethod
+  fun copyToClipboard(text: String) {
+    try {
+      val cm = reactApplicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+      cm.setPrimaryClip(ClipData.newPlainText("MeloVault", text))
+    } catch (_: Exception) {}
+  }
 
   // ── Equalizer ──────────────────────────────────────────────────────────
 
