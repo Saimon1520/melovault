@@ -1,9 +1,9 @@
 name: Build Android
 
+# Manual-only. Releases are created by hand (see RELEASING.md) so they keep
+# their real notes and the locally-built, properly-signed APK — auto-creating a
+# release from every pushed tag overwrote those and produced duplicates.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       build_type:
@@ -93,29 +93,3 @@ jobs:
           name: melovault-${{ github.ref_name }}.aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: android/app/build/outputs/apk/release/app-release.apk
-          name: MeloVault ${{ github.ref_name }}
-          body: |
-            ## MeloVault ${{ github.ref_name }}
-
-            ### Descargar e instalar en Android
-            1. Descarga `app-release.apk` de los archivos de esta release
-            2. En tu celular Android: **Ajustes → Seguridad → Instalar apps desconocidas** → habilitar para tu navegador
-            3. Abre el APK descargado e instala
-
-            | Plataforma | Archivo | Notas |
-            |---|---|---|
-            | Android 6.0+ (directo) | `app-release.apk` | Descarga e instala directamente |
-            | Android (Play Store) | `.aab` bajo pedido | — |
-            | iOS | Requiere macOS + Xcode | Ver README |
-
-            ### Requisitos mínimos
-            - Android 6.0 (API 23) o superior
-            - ~50 MB espacio en disco
-          draft: false
-          prerelease: false
