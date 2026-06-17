@@ -154,6 +154,51 @@ export class MediaScanner {
     return songs;
   }
 
+  // Find the MediaStore asset id for a file path. Needed for deletion: on
+  // scoped storage we can only delete shared audio through MediaLibrary, which
+  // keys on the MediaStore id — and we don't persist that id on the song row
+  // (WatermelonDB assigns its own random id, the asset id is dropped at scan).
+  static async resolveAssetId(filePath: string): Promise<string | undefined> {
+    if (Platform.OS !== 'android') return undefined;
+
+    const permission = await MediaLibrary.requestPermissionsAsync();
+    if (permission.status !== 'granted') return undefined;
+
+    const targetName = decodeURIComponent(filePath.split('/').pop() ?? '');
+    if (!targetName) return undefined;
+
+    // First pass: collect every asset whose filename matches (cheap — no
+    // per-asset lookups). Most libraries have a single match.
+    const candidates: string[] = [];
+    let hasNextPage = true;
+    let after: string | undefined;
+    while (hasNextPage) {
+      const page = await MediaLibrary.getAssetsAsync({
+        mediaType: MediaLibrary.MediaType.audio,
+        after,
+        first: 200,
+        sortBy: [MediaLibrary.SortBy.default],
+      });
+      for (const asset of page.assets) {
+        if (asset.filename === targetName) candidates.push(asset.id);
+      }
+      hasNextPage = page.hasNextPage;
+      after = page.endCursor;
+    }
+
+    if (candidates.length <= 1) return candidates[0];
+
+    // Several files share the name — disambiguate by the real path from the
+    // native MediaStore reader.
+    const norm = (p?: string) => (p ?? '').replace(/^file:\/\//, '');
+    const target = norm(filePath);
+    const meta = await fetchNativeMetadata(candidates);
+    for (const id of candidates) {
+      if (norm(meta[id]?.filePath) === target) return id;
+    }
+    return candidates[0];
+  }
+
   // Also scan filesystem directories directly (catches files MediaLibrary misses)
   static async scanDirectory(
     dirPath: string,

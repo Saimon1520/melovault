@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar, Alert } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar, Alert, ToastAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { SEEK_SECONDS_OPTIONS } from '@/shared/constants/audioFormats';
-import type { PlaybackSpeed } from '@/shared/types';
+import { SongRepository } from '@/features/library/data/repositories/SongRepository';
+import { HiddenSongsModal } from './HiddenSongsModal';
+import type { PlaybackSpeed, Song } from '@/shared/types';
 
 const SPEEDS: PlaybackSpeed[] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
@@ -75,6 +78,29 @@ export function SettingsPlaceholder() {
     interruptionMode, setInterruptionMode,
   } = useSettingsStore();
 
+  const songRepoRef = useRef<SongRepository | null>(null);
+  if (!songRepoRef.current) songRepoRef.current = new SongRepository();
+  const [hiddenSongs, setHiddenSongs] = useState<Song[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
+
+  const loadHidden = useCallback(() => {
+    songRepoRef.current!.getHidden().then(setHiddenSongs).catch(() => {});
+  }, []);
+
+  // Keep the count fresh whenever Settings comes into focus (a song may have
+  // been hidden from the library while this tab was in the background).
+  useFocusEffect(loadHidden);
+
+  const handleUnhide = useCallback(async (songId: string) => {
+    const result = await songRepoRef.current!.unhideSong(songId);
+    if (result.success) {
+      setHiddenSongs(prev => prev.filter(s => s.id !== songId));
+      ToastAndroid.show('Canción restaurada a la biblioteca', ToastAndroid.SHORT);
+    } else {
+      ToastAndroid.show('No se pudo restaurar la canción', ToastAndroid.LONG);
+    }
+  }, []);
+
   const toggleMeetings = (value: boolean) => {
     setPlayDuringMeetings(value);
     Alert.alert(
@@ -121,7 +147,7 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow stacked label="Crossfade" description="Mezcla el final de una canción con el inicio de la siguiente">
+          <SettingRow stacked label="Fundido entre canciones" description="Baja el volumen al final de una canción y sube el de la siguiente. No se superponen (un solo reproductor de audio).">
             <ChipSelector
               options={[0, 2000, 4000, 6000, 8000, 10000, 12000]}
               value={crossfadeMs}
@@ -148,6 +174,27 @@ export function SettingsPlaceholder() {
           </SettingRow>
         </View>
 
+        <SectionHeader title="BIBLIOTECA" />
+        <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
+          <TouchableOpacity
+            onPress={() => { loadHidden(); setShowHidden(true); }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: palette.surface1 }}
+            accessibilityRole="button" accessibilityLabel="Canciones ocultas"
+          >
+            <Ionicons name="eye-off-outline" size={20} color={palette.textSecondary} style={{ marginRight: 14 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.textPrimary, fontSize: 15 }}>Canciones ocultas</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>Volver a mostrarlas en la biblioteca</Text>
+            </View>
+            {hiddenSongs.length > 0 && (
+              <View style={{ minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 8, backgroundColor: palette.surface3, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                <Text style={{ color: palette.textSecondary, fontSize: 13, fontWeight: '700' }}>{hiddenSongs.length}</Text>
+              </View>
+            )}
+            <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         <SectionHeader title="ACERCA DE" />
         <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
           <View style={{ backgroundColor: palette.surface1, paddingHorizontal: 20, paddingVertical: 16 }}>
@@ -160,6 +207,13 @@ export function SettingsPlaceholder() {
           </View>
         </View>
       </ScrollView>
+
+      <HiddenSongsModal
+        visible={showHidden}
+        songs={hiddenSongs}
+        onClose={() => setShowHidden(false)}
+        onUnhide={handleUnhide}
+      />
     </SafeAreaView>
   );
 }

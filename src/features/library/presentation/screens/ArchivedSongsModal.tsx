@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal } from 'react-native';
 import { FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { palette } from '@/design-system/tokens/colors';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
+import { DockedMiniPlayer } from '@/features/player/presentation/components/DockedMiniPlayer';
 import type { Song } from '@/shared/types';
 
 /**
@@ -24,6 +25,17 @@ export function ArchivedSongsModal({
   onLongPress: (song: Song) => void;
 }) {
   const activeTrack = useActiveTrack();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const query = searchQuery.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!query) return songs;
+    return songs.filter(s =>
+      s.title.toLowerCase().includes(query) ||
+      (s.artist?.toLowerCase().includes(query) ?? false) ||
+      (s.album?.toLowerCase().includes(query) ?? false),
+    );
+  }, [songs, query]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -40,9 +52,29 @@ export function ArchivedSongsModal({
           </View>
         </View>
 
+        <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surface2, borderRadius: 12, paddingHorizontal: 12, height: 40 }}>
+            <Ionicons name="search" size={16} color={palette.textMuted} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Buscar en archivados..."
+              placeholderTextColor={palette.textMuted}
+              style={{ flex: 1, color: palette.textPrimary, fontSize: 15, marginLeft: 8 }}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Limpiar búsqueda">
+                <Ionicons name="close-circle" size={18} color={palette.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         <FlatList
-          data={songs}
+          data={filtered}
           keyExtractor={s => s.id}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <SongListItem
               song={item}
@@ -55,9 +87,13 @@ export function ArchivedSongsModal({
           ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
           contentContainerStyle={{ paddingBottom: 120 }}
           ListEmptyComponent={
-            <Text style={{ color: palette.textMuted, textAlign: 'center', marginTop: 40 }}>No hay audios archivados.</Text>
+            <Text style={{ color: palette.textMuted, textAlign: 'center', marginTop: 40 }}>
+              {query ? 'Sin resultados.' : 'No hay audios archivados.'}
+            </Text>
           }
         />
+
+        <DockedMiniPlayer onRequestClose={onClose} />
       </SafeAreaView>
     </Modal>
   );

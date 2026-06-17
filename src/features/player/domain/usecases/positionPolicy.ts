@@ -12,6 +12,19 @@ const playlistRepo = new PlaylistRepository();
  */
 export async function shouldRememberPosition(songOrId: Song | string): Promise<boolean> {
   const id = typeof songOrId === 'string' ? songOrId : songOrId.id;
-  if (usePositionMemoryStore.getState().isRemembered(id)) return true;
+  if (isRememberedNow(id)) return true;
+  return inheritsKeepPositionPlaylist(id);
+}
+
+// The per-song opt-in, read straight from the store every call (it's in memory,
+// so this is cheap). Kept separate so the save loop can re-check it on every
+// tick — toggling "Recordar posición" mid-playback must take effect at once.
+export function isRememberedNow(id: string): boolean {
+  return usePositionMemoryStore.getState().isRemembered(id);
+}
+
+// Whether the song inherits position-memory from a playlist. This hits the DB,
+// so callers may cache it per active track (invalidated on track change).
+export async function inheritsKeepPositionPlaylist(id: string): Promise<boolean> {
   return playlistRepo.songIsInKeepPositionPlaylist(id);
 }

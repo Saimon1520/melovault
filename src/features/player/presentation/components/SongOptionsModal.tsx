@@ -91,11 +91,15 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
         {
           text: 'Eliminar', style: 'destructive',
           onPress: async () => {
-            const result = await FileSystemService.deleteSongFile(song.filePath, song.title);
+            const result = await FileSystemService.deleteSongFile(song.filePath);
             if (result.success) {
               await songRepo.deleteSongFromDB(song.id);
+              usePositionMemoryStore.getState().setRemembered(song.id, false);
               onClose();
               onSongDeleted?.(song.id);
+              ToastAndroid.show('Canción eliminada', ToastAndroid.SHORT);
+            } else if (result.code !== 'DELETE_DENIED') {
+              ToastAndroid.show('No se pudo eliminar la canción', ToastAndroid.LONG);
             }
           },
         },

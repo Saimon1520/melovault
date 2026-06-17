@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
   RefreshControl, ActivityIndicator, StatusBar, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { useActiveTrack } from 'react-native-track-player';
@@ -102,7 +103,9 @@ export function LibraryPlaceholder() {
     setLoading(false);
   }, [sortOrder]);
 
-  useEffect(() => { loadSongs(); }, [loadSongs]);
+  // Reload on focus (not just mount) so changes made elsewhere — e.g. restoring
+  // a hidden song from Settings — show up when returning to the library.
+  useFocusEffect(loadSongs);
 
   const handleScan = useCallback(async () => {
     const result = await startScan();
