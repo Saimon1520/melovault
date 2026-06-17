@@ -1,4 +1,4 @@
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { savePositionOnTrackChange, savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
@@ -50,10 +50,21 @@ export async function PlaybackService() {
     } catch { /* ignore */ }
     const crossfadeMs = useSettingsStore.getState().crossfadeMs;
     if (crossfadeMs > 0) {
-      await fade.fadeIn(crossfadeMs);
+      // RNTP drives a single ExoPlayer, so two tracks can't truly overlap. The
+      // outgoing track already faded down over the full crossfade window; bring
+      // the incoming one up quickly so it's audible right away instead of
+      // leaving a long, "stopped"-sounding quiet gap on a big crossfade value.
+      await fade.fadeIn(Math.min(crossfadeMs, 2500));
     } else {
       await fade.reset();
     }
+  });
+
+  // ── Save the position the moment playback pauses ─────────────────────────
+  // The interval + progress event only persist while PLAYING, so without this a
+  // pause (then app close) would lose the last few seconds before the pause.
+  TrackPlayer.addEventListener(Event.PlaybackState, (e) => {
+    if (e.state === State.Paused) savePositionNow(true);
   });
 
   // ── Crossfade: fade the current track out as it approaches its end ───────

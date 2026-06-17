@@ -6,6 +6,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import TrackPlayer from 'react-native-track-player';
 import { usePlayerProgress } from '../hooks/usePlayerControls';
+import { savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { formatTime } from '@/shared/utils/formatTime';
 import { palette } from '@/design-system/tokens/colors';
 
@@ -23,7 +24,14 @@ export function ProgressSlider() {
   // updates ~every 250ms) catches up — otherwise the thumb appears not to move
   // until the next tick (felt like needing a second tap).
   const seekToAndHold = async (pos: number) => {
-    if (duration > 0) await TrackPlayer.seekTo(pos * duration);
+    if (duration > 0) {
+      const targetSec = pos * duration;
+      await TrackPlayer.seekTo(targetSec);
+      // Persist the seeked position right away — this is the only save that
+      // happens while PAUSED (the interval + progress event only fire while
+      // playing), so a paused seek + close would otherwise be lost.
+      savePositionNow(true, targetSec);
+    }
     setTimeout(() => { isSeeking.value = false; }, 400);
   };
 

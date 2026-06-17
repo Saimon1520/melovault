@@ -9,6 +9,8 @@ import { SongRepository } from '@/features/library/data/repositories/SongReposit
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
 import { useFavoritesStore } from '@/features/player/store/favoritesStore';
+import { shuffle } from '@/shared/utils/shuffle';
+import { DockedMiniPlayer } from '@/features/player/presentation/components/DockedMiniPlayer';
 import type { Song } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -25,7 +27,7 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
   const favoriteIds = useFavoritesStore(s => s.favoriteIds);
   const toggleFavorite = useFavoritesStore(s => s.toggleFavorite);
   const [songs, setSongs] = useState<Song[]>([]);
-  const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
+  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
 
   // Re-resolve the favorited songs whenever the set changes or we open.
   useEffect(() => {
@@ -44,6 +46,23 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
     setQueueIndex(index);
     await audioService.setQueue(songs, index, 0);
   }, [songs, setCurrentSong, setQueue, setQueueIndex]);
+
+  const playInOrder = useCallback(async () => {
+    if (songs.length === 0) return;
+    setShuffleEnabled(false);
+    await playAt(0);
+  }, [songs, setShuffleEnabled, playAt]);
+
+  // Fresh random order on every press — never the same sequence twice.
+  const playShuffled = useCallback(async () => {
+    if (songs.length === 0) return;
+    const order = shuffle(songs);
+    setShuffleEnabled(true);
+    setCurrentSong(order[0]!);
+    setQueue(order, 0, order);
+    setQueueIndex(0);
+    await audioService.setQueue(order, 0, 0);
+  }, [songs, setShuffleEnabled, setCurrentSong, setQueue, setQueueIndex]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -74,6 +93,25 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
             </Text>
           </View>
         ) : (
+          <>
+          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 12 }}>
+            <TouchableOpacity
+              onPress={playInOrder}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 26, backgroundColor: palette.accent }}
+              accessibilityRole="button" accessibilityLabel="Reproducir"
+            >
+              <Ionicons name="play" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Reproducir</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={playShuffled}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 26, backgroundColor: palette.surface2 }}
+              accessibilityRole="button" accessibilityLabel="Reproducir aleatoriamente"
+            >
+              <Ionicons name="shuffle" size={18} color={palette.accent} />
+              <Text style={{ color: palette.accent, fontSize: 15, fontWeight: '700' }}>Aleatorio</Text>
+            </TouchableOpacity>
+          </View>
           <FlatList
             data={songs}
             keyExtractor={s => s.id}
@@ -107,7 +145,10 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
             ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
             contentContainerStyle={{ paddingBottom: 120 }}
           />
+          </>
         )}
+
+        <DockedMiniPlayer onRequestClose={onClose} />
       </SafeAreaView>
     </Modal>
   );

@@ -11,6 +11,9 @@ import { PlaylistRepository } from '@/features/playlists/data/repositories/Playl
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
+import { useArchiveStore } from '@/features/library/store/archiveStore';
+import { DockedMiniPlayer } from '@/features/player/presentation/components/DockedMiniPlayer';
+import { shuffle } from '@/shared/utils/shuffle';
 import type { Playlist, Song } from '@/shared/types';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
@@ -40,24 +43,30 @@ function SongPickerModal({
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Hide non-music (notification tones, WhatsApp voice notes…) by default —
+  // they're rarely what you want in a playlist. Toggle off to see everything.
+  const [onlySongs, setOnlySongs] = useState(true);
 
   useEffect(() => {
     if (visible) {
       setQuery('');
       setSelected(new Set());
+      setOnlySongs(true);
       songRepo.getAll('title').then(setAllSongs);
     }
   }, [visible]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const base = allSongs.filter(s => !excludeIds.has(s.id));
+    const isArchived = useArchiveStore.getState().isArchived;
+    let base = allSongs.filter(s => !excludeIds.has(s.id));
+    if (onlySongs) base = base.filter(s => !isArchived(s));
     if (!q) return base;
     return base.filter(s =>
       s.title.toLowerCase().includes(q) ||
       s.artist.toLowerCase().includes(q) ||
       s.album.toLowerCase().includes(q));
-  }, [allSongs, query, excludeIds]);
+  }, [allSongs, query, excludeIds, onlySongs]);
 
   const toggle = useCallback((id: string) => {
     setSelected(prev => {
@@ -91,6 +100,24 @@ function SongPickerModal({
               </TouchableOpacity>
             )}
           </View>
+        </View>
+
+        {/* Quick filter: hide non-music (archived) audios */}
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8 }}>
+          <TouchableOpacity
+            onPress={() => setOnlySongs(v => !v)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16,
+              backgroundColor: onlySongs ? palette.accentSoft : palette.surface2,
+              borderWidth: 1, borderColor: onlySongs ? palette.accent : 'transparent',
+            }}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: onlySongs }}
+            accessibilityLabel="Mostrar solo canciones"
+          >
+            <Ionicons name={onlySongs ? 'musical-notes' : 'musical-notes-outline'} size={15} color={onlySongs ? palette.accent : palette.textMuted} />
+            <Text style={{ color: onlySongs ? palette.accent : palette.textMuted, fontSize: 13, fontWeight: '600' }}>Solo canciones</Text>
+          </TouchableOpacity>
         </View>
 
         <FlashList
@@ -163,7 +190,7 @@ export function PlaylistDetailScreen({
 }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [showPicker, setShowPicker] = useState(false);
-  const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
+  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
 
   const load = useCallback(async () => {
     if (!playlist) return;
@@ -185,17 +212,42 @@ export function PlaylistDetailScreen({
     if (!playlist) return;
     await playlistRepo.removeSong(playlist.id, songId);
     setSongs(prev => prev.filter(s => s.id !== songId));
+    // If this playlist is what's currently playing, also drop the song from the
+    // live queue so it doesn't keep coming up after being removed.
+    if (usePlayerStore.getState().queueContextId === playlist.id) {
+      await audioService.removeFromQueue(songId);
+      usePlayerStore.getState().removeSongFromQueue(songId);
+    }
     onChanged();
   }, [playlist, onChanged]);
 
   const playAt = useCallback(async (index: number) => {
     const song = songs[index];
-    if (!song) return;
+    if (!song || !playlist) return;
     setCurrentSong(song);
-    setQueue(songs, index, songs);
+    setQueue(songs, index, songs, playlist.id);
     setQueueIndex(index);
     await audioService.setQueue(songs, index, 0);
-  }, [songs, setCurrentSong, setQueue, setQueueIndex]);
+  }, [songs, playlist, setCurrentSong, setQueue, setQueueIndex]);
+
+  // Play the whole playlist from the top, in order.
+  const playInOrder = useCallback(async () => {
+    if (songs.length === 0) return;
+    setShuffleEnabled(false);
+    await playAt(0);
+  }, [songs, setShuffleEnabled, playAt]);
+
+  // Play the playlist in a fresh random order — re-shuffled on every press, so
+  // it's never the same sequence twice.
+  const playShuffled = useCallback(async () => {
+    if (songs.length === 0 || !playlist) return;
+    const order = shuffle(songs);
+    setShuffleEnabled(true);
+    setCurrentSong(order[0]!);
+    setQueue(order, 0, order, playlist.id);
+    setQueueIndex(0);
+    await audioService.setQueue(order, 0, 0);
+  }, [songs, playlist, setShuffleEnabled, setCurrentSong, setQueue, setQueueIndex]);
 
   const excludeIds = useMemo(() => new Set(songs.map(s => s.id)), [songs]);
 
@@ -248,6 +300,25 @@ export function PlaylistDetailScreen({
             </TouchableOpacity>
           </View>
         ) : (
+          <>
+          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 12 }}>
+            <TouchableOpacity
+              onPress={playInOrder}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 26, backgroundColor: palette.accent }}
+              accessibilityRole="button" accessibilityLabel="Reproducir"
+            >
+              <Ionicons name="play" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Reproducir</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={playShuffled}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 26, backgroundColor: palette.surface2 }}
+              accessibilityRole="button" accessibilityLabel="Reproducir aleatoriamente"
+            >
+              <Ionicons name="shuffle" size={18} color={palette.accent} />
+              <Text style={{ color: palette.accent, fontSize: 15, fontWeight: '700' }}>Aleatorio</Text>
+            </TouchableOpacity>
+          </View>
           <FlashList
             data={songs}
             estimatedItemSize={64}
@@ -271,6 +342,7 @@ export function PlaylistDetailScreen({
             ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
             contentContainerStyle={{ paddingBottom: 120 }}
           />
+          </>
         )}
 
         <SongPickerModal
@@ -279,6 +351,8 @@ export function PlaylistDetailScreen({
           onClose={() => setShowPicker(false)}
           onAdd={handleAdd}
         />
+
+        {!showPicker && <DockedMiniPlayer onRequestClose={onClose} />}
       </SafeAreaView>
     </Modal>
   );

@@ -2,7 +2,7 @@ import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
 import { usePlayerStore } from '@/features/player/store/playerStore';
-import { shouldRememberPosition } from './positionPolicy';
+import { shouldRememberPosition, isRememberedNow, inheritsKeepPositionPlaylist } from './positionPolicy';
 
 let songRepo: SongRepository | null = null;
 let playerStateRepo: PlayerStateRepository | null = null;
@@ -13,17 +13,20 @@ function repos() {
   return { songRepo, playerStateRepo };
 }
 
-// Cache the "remember position" decision for the active track so the 5s save
-// loop doesn't hit the DB every tick.
-let rememberCache: { id: string; remember: boolean } | null = null;
+// Cache ONLY the playlist-inheritance half of the decision (it hits the DB) for
+// the active track, invalidated on track change. The per-song opt-in is read
+// fresh every call so toggling "Recordar posición" mid-playback is seen at once
+// (the old cache only refreshed on track change, so the toggle never took).
+let playlistInheritCache: { id: string; inherits: boolean } | null = null;
 async function remembersFor(trackId: string): Promise<boolean> {
-  if (rememberCache?.id === trackId) return rememberCache.remember;
-  const remember = await shouldRememberPosition(trackId);
-  rememberCache = { id: trackId, remember };
-  return remember;
+  if (isRememberedNow(trackId)) return true;
+  if (playlistInheritCache?.id === trackId) return playlistInheritCache.inherits;
+  const inherits = await inheritsKeepPositionPlaylist(trackId);
+  playlistInheritCache = { id: trackId, inherits };
+  return inherits;
 }
 export function invalidateRememberCache(): void {
-  rememberCache = null;
+  playlistInheritCache = null;
 }
 
 const SAVE_INTERVAL_MS = 2000;   // foreground periodic backup
@@ -35,11 +38,13 @@ let lastSaveAt = 0;
 // playback-progress event, which keeps firing in the background) and, with
 // `force`, the instant the app goes to the background/closes — so reopening
 // resumes at the exact second instead of the last 5s checkpoint.
-export async function savePositionNow(force = false): Promise<void> {
+export async function savePositionNow(force = false, overridePositionSec?: number): Promise<void> {
   const now = Date.now();
   if (!force && now - lastSaveAt < SAVE_THROTTLE_MS) return;
   try {
-    const position = await TrackPlayer.getPosition();
+    // After a seek, getPosition() can still report the pre-seek value for a
+    // tick, so the caller passes the target position explicitly.
+    const position = overridePositionSec ?? await TrackPlayer.getPosition();
     const track = await TrackPlayer.getActiveTrack();
     if (track?.id == null) return;
     lastSaveAt = now;

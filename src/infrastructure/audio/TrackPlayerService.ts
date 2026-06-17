@@ -142,6 +142,21 @@ export class TrackPlayerService {
     await TrackPlayer.add(this.songToTrack(song));
   }
 
+  // Remove every (non-currently-playing) occurrence of a song from the live
+  // queue — used when a song is removed from the playlist that's playing, so it
+  // doesn't keep coming up. The active track is left alone to avoid cutting off
+  // what's playing right now.
+  async removeFromQueue(songId: string): Promise<void> {
+    const queue = await TrackPlayer.getQueue();
+    const activeIndex = await TrackPlayer.getActiveTrackIndex();
+    const indices = queue
+      .map((t, i) => (String(t.id) === songId ? i : -1))
+      .filter(i => i >= 0 && i !== activeIndex);
+    if (indices.length > 0) {
+      await TrackPlayer.remove(indices);
+    }
+  }
+
   async stop(): Promise<void> {
     await TrackPlayer.stop();
   }

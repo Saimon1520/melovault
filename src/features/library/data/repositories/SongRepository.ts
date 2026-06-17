@@ -168,6 +168,30 @@ export class SongRepository {
     }
   }
 
+  // Bring a hidden song back into the library.
+  async unhideSong(id: string): Promise<Result<void>> {
+    try {
+      await database.write(async () => {
+        const record = await this.collection.find(id);
+        await record.update(r => { r.isHidden = false; });
+      });
+      return { success: true, data: undefined };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e : new Error('Unhide failed'), code: 'UNHIDE_FAILED' };
+    }
+  }
+
+  // The songs the user has hidden from the library (managed from Settings).
+  async getHidden(): Promise<Song[]> {
+    const records = await this.collection
+      .query(
+        Q.where('is_hidden', true),
+        Q.sortBy('title', Q.asc),
+      )
+      .fetch();
+    return records.map(modelToSong);
+  }
+
   async deleteSongFromDB(id: string): Promise<Result<void>> {
     try {
       await database.write(async () => {
