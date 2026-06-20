@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 export interface SelectorOption<T> {
   value: T;
@@ -30,6 +30,7 @@ interface CompactSelectorProps<T> {
 export function CompactSelector<T extends string | number>({
   value, options, onChange, title, icon, triggerLabel, minTriggerWidth,
 }: CompactSelectorProps<T>) {
+  const palette = useTheme();
   const [open, setOpen] = useState(false);
   const current = options.find(o => o.value === value);
 

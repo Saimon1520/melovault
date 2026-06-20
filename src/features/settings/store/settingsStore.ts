@@ -43,7 +43,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      theme: 'dark',
+      theme: 'system',
       seekSeconds: 10,
       crossfadeMs: 0,
       defaultSpeed: 1.0,

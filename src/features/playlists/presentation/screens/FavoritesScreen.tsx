@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { usePlayerStore } from '@/features/player/store/playerStore';
@@ -23,6 +23,7 @@ const audioService = TrackPlayerService.getInstance();
  * it here; un-hearting removes it. Nothing is stored as a real DB playlist.
  */
 export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const palette = useTheme();
   const activeTrack = useActiveTrack();
   const favoriteIds = useFavoritesStore(s => s.favoriteIds);
   const toggleFavorite = useFavoritesStore(s => s.toggleFavorite);
@@ -142,7 +143,7 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
                 </TouchableOpacity>
               </TouchableOpacity>
             )}
-            ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+            ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />}
             contentContainerStyle={{ paddingBottom: 120 }}
           />
           </>

@@ -9,7 +9,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
+import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { artworkSize } from '@/design-system/tokens/breakpoints';
 import { ProgressSlider } from '../components/ProgressSlider';
 import { PlayerControls } from '../components/PlayerControls';
@@ -32,6 +33,7 @@ interface NowPlayingScreenProps {
 }
 
 export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { isPlaying } = usePlayerControls();
@@ -105,13 +107,13 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
           // speed row never sits under the system navigation bar.
           paddingBottom: Math.max(insets.bottom, 24) + 12,
         }]}>
-          <StatusBar barStyle="light-content" />
+          <ThemedStatusBar />
 
           {/* Swipe-to-dismiss zone — ONLY the drag handle, so it never steals
               taps from the header buttons or the controls below. */}
           <GestureDetector gesture={dismissGesture}>
             <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 8 }}>
-              <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+              <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: palette.glass20 }} />
             </View>
           </GestureDetector>
 
@@ -120,7 +122,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
             <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar">
               <Ionicons name="chevron-down" size={26} color={palette.textSecondary} />
             </TouchableOpacity>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
+            <Text style={{ color: palette.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
               {isPlaying ? 'REPRODUCIENDO' : 'EN PAUSA'}
             </Text>
             <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -201,7 +203,7 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 5,
                   paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: active ? palette.accentSoft : 'rgba(255,255,255,0.05)',
+                  backgroundColor: active ? palette.accentSoft : palette.glass10,
                   borderWidth: 1,
                   borderColor: active ? palette.accent : 'transparent',
                 }}

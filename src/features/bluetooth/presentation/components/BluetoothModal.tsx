@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, ActivityIndicator, NativeModules } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 type DeviceType = 'bluetooth' | 'wired' | 'usb' | 'speaker';
 
@@ -28,6 +28,7 @@ const AudioControl: {
 const PRIORITY: DeviceType[] = ['bluetooth', 'usb', 'wired', 'speaker'];
 
 export function BluetoothModal({ visible, onClose }: BluetoothModalProps) {
+  const palette = useTheme();
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -91,7 +92,7 @@ export function BluetoothModal({ visible, onClose }: BluetoothModalProps) {
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
-                      borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+                      borderBottomWidth: 1, borderBottomColor: palette.glass10,
                     }}
                     accessibilityRole="button" accessibilityLabel={item.name}
                   >

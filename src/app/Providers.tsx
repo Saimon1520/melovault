@@ -8,7 +8,7 @@ import { restoreLastSession, startPositionPersistence, savePositionNow } from '@
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { OnboardingScreen } from '@/features/onboarding/presentation/screens/OnboardingScreen';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 const ONBOARDING_KEY = '@melovault/onboarding_complete';
 
@@ -17,6 +17,7 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
+  const palette = useTheme();
   const [appState, setAppState] = useState<'loading' | 'onboarding' | 'ready'>('loading');
 
   useEffect(() => {

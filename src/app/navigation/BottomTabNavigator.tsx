@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import type { BottomTabParamList } from './types';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { MiniPlayer } from '@/features/player/presentation/components/MiniPlayer';
 import { NowPlayingScreen } from '@/features/player/presentation/screens/NowPlayingScreen';
 import { LibraryPlaceholder } from '@/features/library/presentation/screens/LibraryPlaceholder';
@@ -26,6 +26,7 @@ const TAB_ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }
 };
 
 export function BottomTabNavigator() {
+  const palette = useTheme();
   const [nowPlayingOpen, setNowPlayingOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [activeSongId, setActiveSongId] = useState<string | undefined>();
@@ -74,7 +75,7 @@ export function BottomTabNavigator() {
           tabBarInactiveTintColor: palette.textMuted,
           tabBarStyle: {
             backgroundColor: palette.surface1,
-            borderTopColor: 'rgba(255,255,255,0.05)',
+            borderTopColor: palette.glass10,
             borderTopWidth: 1,
             paddingBottom: 4,
           },

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SLEEP_TIMER_OPTIONS_MINUTES } from '@/shared/constants/audioFormats';
 
 // "5 minutos", "1 hora", "1 h 30 min" — Spotify-style human labels.
@@ -20,6 +20,7 @@ interface SleepTimerModalProps {
 }
 
 export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
+  const palette = useTheme();
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [selectedMin, setSelectedMin] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -120,7 +121,7 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
               {remainingMs !== null && (
                 <TouchableOpacity
                   onPress={() => { cancelTimer(); onClose(); }}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: palette.glass10 }}
                   accessibilityRole="button"
                 >
                   <Text style={{ flex: 1, color: palette.error, fontSize: 15, fontWeight: '600' }}>

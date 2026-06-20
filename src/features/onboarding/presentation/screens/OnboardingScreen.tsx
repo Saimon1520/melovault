@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library/legacy';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { ScanLibraryUseCase, type ScanResult } from '@/features/library/domain/usecases/ScanLibraryUseCase';
 import type { ScanProgress } from '@/infrastructure/filesystem/MediaScanner';
 
@@ -22,6 +22,7 @@ interface OnboardingScreenProps {
 type Step = 'welcome' | 'permissions' | 'scanning' | 'done';
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const palette = useTheme();
   const [step, setStep] = useState<Step>('welcome');
   const [scanProgress, setScanProgress] = useState(0);
   const [scanTotal, setScanTotal] = useState(0);

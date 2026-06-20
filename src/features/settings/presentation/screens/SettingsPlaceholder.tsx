@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, Switch, ScrollView, StatusBar, Alert, Toa
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
+import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { SEEK_SECONDS_OPTIONS } from '@/shared/constants/audioFormats';
 import { CompactSelector } from '@/shared/components/CompactSelector';
@@ -14,6 +15,7 @@ import type { PlaybackSpeed, Song } from '@/shared/types';
 const SPEEDS: PlaybackSpeed[] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
 function SectionHeader({ title }: { title: string }) {
+  const palette = useTheme();
   return (
     <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 }}>
       {title}
@@ -22,6 +24,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 function SettingRow({ label, description, children, stacked }: { label: string; description?: string; children: React.ReactNode; stacked?: boolean }) {
+  const palette = useTheme();
   // `stacked` puts the control on its own row below the label — used for chip
   // selectors so the chips get the full width and don't get squeezed / wrap
   // awkwardly next to the label (especially in portrait).
@@ -59,7 +62,9 @@ function ChipSelector<T extends string | number>({ options, value, onChange, for
 }
 
 export function SettingsPlaceholder() {
+  const palette = useTheme();
   const {
+    theme, setTheme,
     seekSeconds, setSeekSeconds,
     crossfadeMs, setCrossfadeMs,
     gaplessPlayback, setGaplessPlayback,
@@ -103,12 +108,29 @@ export function SettingsPlaceholder() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+      <ThemedStatusBar />
       <Text style={{ color: palette.textPrimary, fontSize: 26, fontWeight: '800', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
         Ajustes
       </Text>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
+        <SectionHeader title="APARIENCIA" />
+        <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
+          <SettingRow label="Tema" description="Claro, oscuro o según el sistema">
+            <CompactSelector
+              title="Tema"
+              value={theme}
+              options={[
+                { value: 'system', label: 'Según el sistema' },
+                { value: 'light', label: 'Claro' },
+                { value: 'dark', label: 'Oscuro' },
+              ]}
+              onChange={setTheme}
+              icon="contrast-outline"
+            />
+          </SettingRow>
+        </View>
+
         <SectionHeader title="REPRODUCCIÓN" />
         <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
           <SettingRow label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">
@@ -120,7 +142,7 @@ export function SettingsPlaceholder() {
               format={v => `${v}s`}
             />
           </SettingRow>
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
           <SettingRow label="Velocidad predeterminada">
             <ChipSelector
               title="Velocidad predeterminada"
@@ -130,7 +152,7 @@ export function SettingsPlaceholder() {
               format={v => `${v}x`}
             />
           </SettingRow>
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
           <SettingRow label="Reproducción sin pausas" description="Elimina el silencio entre canciones">
             <Switch
               value={gaplessPlayback} onValueChange={setGaplessPlayback}
@@ -138,7 +160,7 @@ export function SettingsPlaceholder() {
               thumbColor={gaplessPlayback ? palette.accent : palette.textMuted}
             />
           </SettingRow>
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
           <SettingRow label="Fundido entre canciones" description="Baja el volumen al final de una canción y sube el de la siguiente. No se superponen (un solo reproductor de audio).">
             <ChipSelector
               title="Fundido entre canciones"
@@ -148,7 +170,7 @@ export function SettingsPlaceholder() {
               format={v => v === 0 ? 'Off' : `${v / 1000}s`}
             />
           </SettingRow>
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
           <SettingRow label="Al sonar una notificación" description="Qué hacer cuando otra app reproduce un sonido. Aplica al reiniciar.">
             <ChipSelector
               title="Al sonar una notificación"
@@ -158,7 +180,7 @@ export function SettingsPlaceholder() {
               format={v => (v === 'pause' ? 'Pausar' : 'Atenuar')}
             />
           </SettingRow>
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
           <SettingRow label="Reproducir en reuniones y llamadas" description="No pausar la música cuando otra app (Meet, Zoom…) usa el audio. Aplica al reiniciar.">
             <Switch
               value={playDuringMeetings} onValueChange={toggleMeetings}

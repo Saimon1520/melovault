@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { LRCLibService } from '@/infrastructure/lyrics/LRCLibService';
@@ -16,6 +16,7 @@ import { usePlayerProgress } from '@/features/player/presentation/hooks/usePlaye
 const repo = new SongRepository();
 
 export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: () => void }) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const { position } = usePlayerProgress();
@@ -284,7 +285,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
 
       {/* Manual karaoke sync offset (per song, positive delay only) */}
       {syncedLines.length > 0 && !isEditing && !loading && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: palette.glass10 }}>
           <Ionicons name="sync-outline" size={16} color={palette.textMuted} />
           <TouchableOpacity
             onPress={() => bumpOffset(-500)}
