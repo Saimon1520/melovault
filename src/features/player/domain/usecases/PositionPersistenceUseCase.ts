@@ -29,6 +29,16 @@ export function invalidateRememberCache(): void {
   playlistInheritCache = null;
 }
 
+// The notification "stop" button reset()s the player to dismiss the
+// notification. reset() fires a PlaybackActiveTrackChanged whose `lastPosition`
+// can be STALE (e.g. the position from before a recent seek). The stop handler
+// already saved the exact position, so that one track-change save is redundant
+// and must NOT overwrite the good value — suppress it once.
+let skipNextTrackChangeSaveFlag = false;
+export function skipNextTrackChangeSave(): void {
+  skipNextTrackChangeSaveFlag = true;
+}
+
 // The periodic save is only a crash/kill backup — graceful exits (pause,
 // app-background, track change, stop) force-save the exact position, so this
 // cadence can be relaxed a lot to cut background DB/AsyncStorage writes (and the
@@ -104,6 +114,10 @@ export async function savePositionOnTrackChange(
 ): Promise<void> {
   try {
     invalidateRememberCache(); // the new active track gets a fresh decision
+    if (skipNextTrackChangeSaveFlag) {
+      skipNextTrackChangeSaveFlag = false;
+      return; // the stop handler already saved the exact position — don't clobber it
+    }
     const lastId = event?.lastTrack?.id;
     const lastPos = event?.lastPosition ?? 0;
     if (lastId == null || lastPos < 1) return;
@@ -116,8 +130,20 @@ export async function savePositionOnTrackChange(
   }
 }
 
+let restoring = false;
+
 export async function restoreLastSession(): Promise<void> {
+  if (restoring) return; // guard against overlapping cold-start + foreground calls
+  restoring = true;
   try {
+    // Only restore when the player is empty. This makes it safe to call on every
+    // app foreground: after the notification "stop" cleared the queue, the player
+    // is empty here so the saved session (song or playlist, at its saved
+    // position) gets reloaded; a warm reopen of live/paused playback still has
+    // its track and is left untouched.
+    const active = await TrackPlayer.getActiveTrack();
+    if (active?.id != null) return;
+
     const saved = await repos().playerStateRepo.load();
     if (!saved?.currentTrackId) return;
 
@@ -151,5 +177,7 @@ export async function restoreLastSession(): Promise<void> {
     await TrackPlayer.pause();
   } catch {
     // If restore fails, start fresh
+  } finally {
+    restoring = false;
   }
 }

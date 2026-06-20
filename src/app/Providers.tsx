@@ -67,7 +67,15 @@ export function Providers({ children }: ProvidersProps) {
   // precisely where it was, not at the last periodic checkpoint.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'background' || next === 'inactive') savePositionNow(true);
+      if (next === 'background' || next === 'inactive') {
+        savePositionNow(true);
+      } else if (next === 'active') {
+        // Back to the foreground: if the player was cleared while we were away
+        // (the notification "stop" button reset()s the queue), reload the saved
+        // session (song or persistence-playlist, at its saved position) so it's
+        // there to resume. No-op when a track is already loaded.
+        restoreLastSession();
+      }
     });
     return () => sub.remove();
   }, []);
