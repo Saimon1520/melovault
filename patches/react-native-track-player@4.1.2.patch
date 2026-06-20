@@ -706,7 +706,7 @@ index b2409a09939164c49c0f7a16bb6d3284e8eab8fb..cf1fccac750c142e9691f11a16dc0131
      }
  }
 diff --git a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..2aaf841aaa8a44a9b7502bb25c66bd9782369517 100644
+index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..db90840619e760b6991b70b69af925c6910855b1 100644
 --- a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 +++ b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 @@ -158,6 +158,32 @@ class MusicService : HeadlessJsTaskService() {
@@ -760,3 +760,11 @@ index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..2aaf841aaa8a44a9b7502bb25c66bd97
              ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
              ?.emit(event, payload)
      }
+@@ -849,6 +875,6 @@ class MusicService : HeadlessJsTaskService() {
+         const val IS_PAUSED_KEY = "paused"
+ 
+         const val DEFAULT_JUMP_INTERVAL = 15.0
+-        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 5
++        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 0
+     }
+ }

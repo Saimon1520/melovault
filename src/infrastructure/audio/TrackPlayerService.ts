@@ -57,6 +57,12 @@ export class TrackPlayerService {
         // notification, instead of just ducking the volume — unless the user
         // chose "duck" in settings.
         alwaysPauseOnInterruption: pauseOnInterruption,
+        // Remove the media notification IMMEDIATELY when playback stops. RNTP
+        // defaults this grace period to 5s (it's meant to let an app auto-queue
+        // related media after the queue ends), so the notification's "stop"
+        // button appeared to "take forever" to dismiss. We never auto-queue, so
+        // 0 = dismiss at once.
+        stopForegroundGracePeriod: 0,
       },
 
       // Full set of capabilities — shown in:
