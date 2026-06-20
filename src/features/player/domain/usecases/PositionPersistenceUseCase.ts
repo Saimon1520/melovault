@@ -29,10 +29,19 @@ export function invalidateRememberCache(): void {
   playlistInheritCache = null;
 }
 
-const SAVE_INTERVAL_MS = 2000;   // foreground periodic backup
-const SAVE_THROTTLE_MS = 1200;   // de-dupe the multiple triggers
+// The periodic save is only a crash/kill backup — graceful exits (pause,
+// app-background, track change, stop) force-save the exact position, so this
+// cadence can be relaxed a lot to cut background DB/AsyncStorage writes (and the
+// battery they cost) without losing on-close precision. Worst-case loss on a
+// hard kill is bounded by this interval.
+const SAVE_INTERVAL_MS = 5000;   // periodic backup while playing
+const SAVE_THROTTLE_MS = 5000;   // de-dupe the multiple triggers
 let saveIntervalId: ReturnType<typeof setInterval> | null = null;
 let lastSaveAt = 0;
+// Signature of the last persisted player state — skip the AsyncStorage write
+// when nothing changed (e.g. a non-remember song whose stored position stays 0,
+// so only a track/queue change is worth writing).
+let lastPlayerStateSig = '';
 
 // Persist the CURRENT position immediately. Called periodically (interval +
 // playback-progress event, which keeps firing in the background) and, with
@@ -54,11 +63,19 @@ export async function savePositionNow(force = false, overridePositionSec?: numbe
     if (remember) {
       await repos().songRepo.updateLastPosition(track.id as string, positionMs);
     }
-    await repos().playerStateRepo.save({
-      currentTrackId: track.id as string,
-      position: remember ? positionMs : 0,
-      queueIndex: await TrackPlayer.getActiveTrackIndex() ?? 0,
-    });
+    const queueIndex = await TrackPlayer.getActiveTrackIndex() ?? 0;
+    const savedPosition = remember ? positionMs : 0;
+    const sig = `${track.id}|${queueIndex}|${savedPosition}`;
+    // Skip redundant writes — for a non-remember song the stored position is
+    // pinned at 0, so the signature only changes when the track/queue does.
+    if (sig !== lastPlayerStateSig) {
+      lastPlayerStateSig = sig;
+      await repos().playerStateRepo.save({
+        currentTrackId: track.id as string,
+        position: savedPosition,
+        queueIndex,
+      });
+    }
   } catch {
     // Silently ignore persistence errors — they should not affect playback
   }

@@ -370,6 +370,14 @@ export function LibraryPlaceholder() {
             <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />
           )}
           contentContainerStyle={{ paddingBottom: 120 }}
+          // Conservative virtualization tuning: keep fewer offscreen rows in
+          // memory on long libraries (cheaper on old devices). Plain FlatList
+          // virtualization only — NOT FlashList recycling, which blanked tabs
+          // here before (see memory). No visual change.
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={11}
+          updateCellsBatchingPeriod={50}
         />
       )}
 

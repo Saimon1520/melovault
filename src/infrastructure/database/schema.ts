@@ -1,5 +1,16 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
+// ⚠️ DATA-LOSS WARNING — read before touching `version`.
+// WatermelonDB WIPES the entire database (playlists, playlist order, etc.) on
+// app update if the schema `version` here is greater than the one stored on the
+// device AND `migrations/index.ts` has no migration covering that step. So:
+//   • NEVER bump this number without adding a matching migration entry.
+//   • Adding a per-row flag/column? Prefer an AsyncStorage store instead — the
+//     jsi:false bridge adapter no-ops addColumns migrations on this setup, so a
+//     bump would wipe data without actually adding the column. See the existing
+//     archive/positionMemory/favorites stores for the pattern.
+// Auto Backup (AndroidManifest allowBackup) is the safety net for reinstalls,
+// but in-place updates must never trigger a reset — keep this at 1.
 export const dbSchema = appSchema({
   version: 1,
   tables: [

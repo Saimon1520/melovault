@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy Auto Backup rules (Android 11 / API 30 and below).
+  Backs up everything by default (WatermelonDB + AsyncStorage + shared_prefs),
+  excluding only volatile caches, so playlists and library organization survive
+  reinstalls. See data_extraction_rules.xml for the Android 12+ equivalent.
+-->
+<full-backup-content>
+    <exclude domain="file" path="cache" />
+    <exclude domain="external" path="cache" />
+</full-backup-content>

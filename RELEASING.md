@@ -39,3 +39,44 @@ la versión anterior conservando los datos (playlists, favoritos, letras, etc.).
 > **Transición única (solo la primera vez):** la v1.0.0 firmada con la clave de
 > depuración debe desinstalarse una vez antes de instalar la v1.0.0 firmada con
 > esta clave. A partir de ahí, todas las versiones futuras se actualizan solas.
+
+## Revisión de actualización — que NO se pierdan playlists/datos
+
+Los datos del usuario (playlists, orden, favoritos, ocultos, ajustes) viven en
+`databases/watermelon.db` (WatermelonDB) y `databases/RKStorage` (AsyncStorage).
+Una actualización **in-place real conserva todo** porque Android no toca
+`/data`. Los datos solo se borran si Android tiene que **desinstalar** primero.
+Antes de publicar cada release, verifica estas 3 causas de pérdida de datos:
+
+1. **Misma firma.** Si el APK nuevo está firmado con otra clave (p. ej. un build
+   de `pnpm android` firmado con `debug.keystore`, o un keystore regenerado),
+   Android NO actualiza: obliga a desinstalar → se borra todo. Confirma siempre
+   que el APK de distribución sea `assembleRelease` (clave `melovault`). Verifica:
+
+   ```bash
+   # huella del APK que vas a publicar (debe coincidir release-a-release)
+   apksigner verify --print-certs android/app/build/outputs/apk/release/app-release.apk | grep SHA-256
+   ```
+
+2. **Schema de WatermelonDB.** NO subas `version` en `schema.ts` sin añadir una
+   migración en `migrations/index.ts`; un bump sin migración **borra la base de
+   datos** en la actualización. Para flags nuevos por canción usa AsyncStorage
+   (ver `archiveStore`/`positionMemoryStore`). Ver la advertencia en `schema.ts`.
+
+3. **`versionCode` mayor.** Sin esto Android rechaza la actualización.
+
+### Red de seguridad: Auto Backup
+
+`AndroidManifest` tiene `allowBackup="true"` con reglas en
+`res/xml/backup_rules.xml` y `res/xml/data_extraction_rules.xml`. Esto respalda
+WatermelonDB + AsyncStorage en Google, de modo que aunque haya que **reinstalar**
+(o cambiar de teléfono), las playlists y la organización se restauran solas si el
+usuario tiene la copia de seguridad de Google activada y la misma cuenta.
+
+### Probar la actualización antes de publicar
+
+```bash
+# instala la versión vieja, crea una playlist, luego instala la nueva ENCIMA
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+# abre la app y confirma que la playlist sigue ahí (-r = update in-place)
+```
