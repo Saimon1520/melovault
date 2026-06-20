@@ -8,7 +8,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { useActiveTrack } from 'react-native-track-player';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
+import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
 import { SongOptionsModal } from '@/features/player/presentation/components/SongOptionsModal';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
@@ -66,6 +67,7 @@ function groupSongs(songs: Song[], by: 'albums' | 'artists' | 'genres'): SongGro
 }
 
 export function LibraryPlaceholder() {
+  const palette = useTheme();
   const repoRef = useRef<SongRepository | null>(null);
   if (!repoRef.current) repoRef.current = new SongRepository();
   const playlistRepoRef = useRef<PlaylistRepository | null>(null);
@@ -178,7 +180,7 @@ export function LibraryPlaceholder() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={palette.surface0} />
+      <ThemedStatusBar />
 
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
@@ -310,7 +312,7 @@ export function LibraryPlaceholder() {
             </TouchableOpacity>
           )}
           ItemSeparatorComponent={() => (
-            <View style={{ height: 1, marginLeft: 80, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+            <View style={{ height: 1, marginLeft: 80, backgroundColor: palette.glass10 }} />
           )}
           contentContainerStyle={{ paddingBottom: 120 }}
         />
@@ -367,7 +369,7 @@ export function LibraryPlaceholder() {
             />
           }
           ItemSeparatorComponent={() => (
-            <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+            <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />
           )}
           contentContainerStyle={{ paddingBottom: 120 }}
           // Conservative virtualization tuning: keep fewer offscreen rows in

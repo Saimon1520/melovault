@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert, Modal } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import type { Song } from '@/shared/types';
 
@@ -18,6 +18,7 @@ interface ArtworkPickerProps {
 }
 
 export function ArtworkPicker({ song, visible, onClose, onArtworkUpdated }: ArtworkPickerProps) {
+  const palette = useTheme();
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -85,7 +86,7 @@ export function ArtworkPicker({ song, visible, onClose, onArtworkUpdated }: Artw
           {/* Actions */}
           <TouchableOpacity
             onPress={pickImage}
-            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: palette.glass10 }}
             accessibilityRole="button" accessibilityLabel="Elegir imagen de la galería"
           >
             <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: palette.accentSoft, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>

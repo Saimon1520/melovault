@@ -4,7 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay } fro
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerControls } from '../hooks/usePlayerControls';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import type { RepeatMode } from '@/shared/types';
 
 const REPEAT_ICONS: Record<RepeatMode, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -17,7 +17,7 @@ function ControlButton({
   icon,
   onPress,
   size = 26,
-  color = palette.textPrimary,
+  color,
   active = false,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +26,7 @@ function ControlButton({
   color?: string;
   active?: boolean;
 }) {
+  const palette = useTheme();
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -43,13 +44,14 @@ function ControlButton({
       style={{ padding: 8 }}
     >
       <Animated.View style={animStyle}>
-        <Ionicons name={icon} size={size} color={active ? palette.accent : color} />
+        <Ionicons name={icon} size={size} color={active ? palette.accent : (color ?? palette.textPrimary)} />
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
 export function PlayerControls() {
+  const palette = useTheme();
   const {
     isPlaying, shuffleEnabled, repeatMode,
     togglePlayPause, skipToNext, skipToPrevious,

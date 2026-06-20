@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, NativeModules } from 
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
@@ -36,6 +36,7 @@ const SLIDER_HEIGHT = 160;
 const HIT_WIDTH = 48;
 
 function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: number) => void }) {
+  const palette = useTheme();
   const gainToY = (g: number) => ((GAIN_MAX - g) / (GAIN_MAX - GAIN_MIN)) * SLIDER_HEIGHT;
   const position = useSharedValue(gainToY(band.gain));
 
@@ -85,6 +86,7 @@ function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: 
 }
 
 export function EqualizerScreen({ onClose }: { onClose: () => void }) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const {
     persistEqualizer, setPersistEqualizer, setEqualizerState,

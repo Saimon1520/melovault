@@ -6,7 +6,8 @@ import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
+import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
@@ -22,6 +23,7 @@ const songRepo = new SongRepository();
 const audioService = TrackPlayerService.getInstance();
 
 function Artwork({ uri, size = 48, rounded = 8 }: { uri?: string; size?: number; rounded?: number }) {
+  const palette = useTheme();
   return (
     <ExpoImage
       source={uri ? { uri } : DEFAULT_ARTWORK}
@@ -40,6 +42,7 @@ function SongPickerModal({
   onClose: () => void;
   onAdd: (ids: string[]) => void;
 }) {
+  const palette = useTheme();
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -150,7 +153,7 @@ function SongPickerModal({
               </TouchableOpacity>
             );
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />}
           contentContainerStyle={{ paddingBottom: 100 }}
           ListEmptyComponent={
             <Text style={{ color: palette.textMuted, textAlign: 'center', marginTop: 40 }}>
@@ -188,6 +191,7 @@ export function PlaylistDetailScreen({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const palette = useTheme();
   const [songs, setSongs] = useState<Song[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
@@ -254,7 +258,7 @@ export function PlaylistDetailScreen({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" />
+        <ThemedStatusBar />
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 }}>
           <TouchableOpacity onPress={onClose} style={{ padding: 6 }} accessibilityRole="button" accessibilityLabel="Volver">
@@ -339,7 +343,7 @@ export function PlaylistDetailScreen({
                 </TouchableOpacity>
               </TouchableOpacity>
             )}
-            ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+            ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />}
             contentContainerStyle={{ paddingBottom: 120 }}
           />
           </>

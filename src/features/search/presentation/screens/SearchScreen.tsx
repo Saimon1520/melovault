@@ -6,7 +6,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
@@ -23,6 +23,7 @@ function getSongRepo() {
 }
 
 export function SearchScreen() {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const activeTrack = useActiveTrack();
   const [query, setQuery] = useState('');

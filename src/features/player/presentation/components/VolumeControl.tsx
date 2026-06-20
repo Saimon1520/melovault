@@ -3,7 +3,7 @@ import { View, NativeModules } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 const AudioControl: {
   getVolume(): Promise<number>;
@@ -18,6 +18,7 @@ const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v))
  * real value, including changes made with the hardware buttons.
  */
 export function VolumeControl() {
+  const palette = useTheme();
   const [volume, setVolume] = useState(1);
   const thumbX = useSharedValue(TRACK_WIDTH);
   const [width, setWidth] = useState(TRACK_WIDTH);

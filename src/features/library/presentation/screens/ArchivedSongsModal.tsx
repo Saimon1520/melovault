@@ -4,7 +4,7 @@ import { FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
 import { DockedMiniPlayer } from '@/features/player/presentation/components/DockedMiniPlayer';
 import type { Song } from '@/shared/types';
@@ -24,6 +24,7 @@ export function ArchivedSongsModal({
   onPlay: (song: Song) => void;
   onLongPress: (song: Song) => void;
 }) {
+  const palette = useTheme();
   const activeTrack = useActiveTrack();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -84,7 +85,7 @@ export function ArchivedSongsModal({
               onLongPress={onLongPress}
             />
           )}
-          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />}
           contentContainerStyle={{ paddingBottom: 120 }}
           ListEmptyComponent={
             <Text style={{ color: palette.textMuted, textAlign: 'center', marginTop: 40 }}>

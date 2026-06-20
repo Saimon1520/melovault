@@ -6,7 +6,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
+import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { PlaylistDetailScreen } from './PlaylistDetailScreen';
 import { FavoritesScreen } from './FavoritesScreen';
@@ -26,6 +27,7 @@ function PlaylistFormModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(existing?.name ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
@@ -121,6 +123,7 @@ function PlaylistCard({ playlist, onPress, onEdit, onDelete }: {
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const palette = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -168,6 +171,7 @@ function PlaylistCard({ playlist, onPress, onEdit, onDelete }: {
 
 // ── Main screen ──────────────────────────────────────────────────────────────
 export function PlaylistsPlaceholder() {
+  const palette = useTheme();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | undefined>();
@@ -197,7 +201,7 @@ export function PlaylistsPlaceholder() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.surface0 }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+      <ThemedStatusBar />
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <Text style={{ flex: 1, color: palette.textPrimary, fontSize: 26, fontWeight: '800' }}>Playlists</Text>
         <TouchableOpacity
@@ -227,7 +231,7 @@ export function PlaylistsPlaceholder() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
       </TouchableOpacity>
-      <View style={{ height: 1, marginLeft: 86, marginBottom: 4, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+      <View style={{ height: 1, marginLeft: 86, marginBottom: 4, backgroundColor: palette.glass10 }} />
 
       {playlists.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 48 }}>
@@ -248,7 +252,7 @@ export function PlaylistsPlaceholder() {
               onDelete={() => handleDelete(item)}
             />
           )}
-          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 86, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 86, backgroundColor: palette.glass10 }} />}
           contentContainerStyle={{ paddingBottom: 120 }}
         />
       )}

@@ -8,9 +8,10 @@ import TrackPlayer from 'react-native-track-player';
 import { usePlayerProgress } from '../hooks/usePlayerControls';
 import { savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { formatTime } from '@/shared/utils/formatTime';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 export function ProgressSlider() {
+  const palette = useTheme();
   const { position, duration } = usePlayerProgress();
   const sliderWidth = useSharedValue(0);
   const thumbScale = useSharedValue(1);
@@ -92,7 +93,7 @@ export function ProgressSlider() {
           accessibilityLabel={`Progreso: ${formatTime(position * 1000)} de ${formatTime(duration * 1000)}`}
           accessibilityValue={{ min: 0, max: 100, now: Math.round((duration > 0 ? position / duration : 0) * 100) }}
         >
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'visible' }}>
+          <View style={{ height: 4, borderRadius: 2, backgroundColor: palette.glass20, overflow: 'visible' }}>
             <Animated.View style={[barStyle, { height: '100%', backgroundColor: palette.accent, borderRadius: 2 }]} />
           </View>
           <Animated.View style={[thumbStyle, {
@@ -103,10 +104,10 @@ export function ProgressSlider() {
         </View>
       </GestureDetector>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+        <Text style={{ color: palette.textMuted, fontSize: 12 }}>
           {formatTime(position * 1000)}
         </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+        <Text style={{ color: palette.textMuted, fontSize: 12 }}>
           {formatTime(duration * 1000)}
         </Text>
       </View>

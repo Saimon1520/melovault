@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Modal, Alert, FlatList } from 'react-nati
 import TrackPlayer, { Track, useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
@@ -13,6 +13,7 @@ interface QueueScreenProps {
 }
 
 export function QueueScreen({ visible, onClose }: QueueScreenProps) {
+  const palette = useTheme();
   const activeTrack = useActiveTrack();
   const [queue, setQueue] = useState<Track[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);

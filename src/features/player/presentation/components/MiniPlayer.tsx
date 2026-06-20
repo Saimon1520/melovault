@@ -9,7 +9,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveTrack } from 'react-native-track-player';
 import { usePlayerControls, usePlayerProgress } from '../hooks/usePlayerControls';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 
 interface MiniPlayerProps {
   onExpand: () => void;
@@ -19,6 +19,7 @@ interface MiniPlayerProps {
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
 export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
+  const palette = useTheme();
   const activeTrack = useActiveTrack();
   const { isPlaying, togglePlayPause, skipToNext, skipToPrevious } = usePlayerControls();
   const { position, duration } = usePlayerProgress();
@@ -58,7 +59,7 @@ export function MiniPlayer({ onExpand, onQueueOpen }: MiniPlayerProps) {
         elevation: 10,
       }]}>
         {/* Progress line */}
-        <View style={{ height: 2, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+        <View style={{ height: 2, backgroundColor: palette.glass10 }}>
           <View style={{
             width: `${progress * 100}%`,
             height: '100%',

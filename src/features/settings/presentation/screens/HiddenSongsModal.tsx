@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Modal, FlatList } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { DockedMiniPlayer } from '@/features/player/presentation/components/DockedMiniPlayer';
 import type { Song } from '@/shared/types';
 
@@ -22,6 +22,7 @@ export function HiddenSongsModal({
   onClose: () => void;
   onUnhide: (songId: string) => void;
 }) {
+  const palette = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const query = searchQuery.trim().toLowerCase();
@@ -94,7 +95,7 @@ export function HiddenSongsModal({
               </TouchableOpacity>
             </View>
           )}
-          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: 'rgba(255,255,255,0.04)' }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />}
           contentContainerStyle={{ paddingBottom: 120 }}
           ListEmptyComponent={
             <Text style={{ color: palette.textMuted, textAlign: 'center', marginTop: 40 }}>

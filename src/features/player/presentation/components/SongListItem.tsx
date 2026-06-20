@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { formatTime } from '@/shared/utils/formatTime';
 import type { Song } from '@/shared/types';
 
@@ -19,6 +19,7 @@ interface SongListItemProps {
 export const SongListItem = memo(function SongListItem({
   song, isPlaying, hasPersistence, onPress, onLongPress,
 }: SongListItemProps) {
+  const palette = useTheme();
   return (
     <TouchableOpacity
       onPress={() => onPress(song)}

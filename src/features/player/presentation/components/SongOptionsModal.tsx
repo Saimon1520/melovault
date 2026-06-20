@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Modal, ScrollView, Alert, Switch, NativeM
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import { palette } from '@/design-system/tokens/colors';
+import { useTheme } from '@/design-system/useTheme';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
@@ -29,6 +29,7 @@ interface SongOptionsModalProps {
 }
 
 export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSongHidden }: SongOptionsModalProps) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -118,7 +119,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
       <View style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}>
        <ResponsivePane>
         {/* Song header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: palette.glass10 }}>
           <ExpoImage
             source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
             style={{ width: 52, height: 52, borderRadius: 10 }}
