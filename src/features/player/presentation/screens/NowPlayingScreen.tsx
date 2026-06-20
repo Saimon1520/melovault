@@ -214,6 +214,8 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
                 </Text>
               </TouchableOpacity>
             ))}
+            {/* Speed sits alongside the other quick toggles (it's compact now). */}
+            <SpeedControl />
           </View>
 
           {/* Progress */}
@@ -222,10 +224,9 @@ export function NowPlayingScreen({ onClose, songId }: NowPlayingScreenProps) {
           {/* Controls */}
           <PlayerControls />
 
-          {/* Volume + Speed row */}
-          <View style={{ paddingHorizontal: 24, marginTop: 8, gap: 10 }}>
+          {/* Volume */}
+          <View style={{ paddingHorizontal: 24, marginTop: 8 }}>
             <VolumeControl />
-            <SpeedControl />
           </View>
           </ScrollView>
         </Animated.View>

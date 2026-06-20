@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { SLEEP_TIMER_OPTIONS_MINUTES } from '@/shared/constants/audioFormats';
+
+// "5 minutos", "1 hora", "1 h 30 min" — Spotify-style human labels.
+function formatMinutes(min: number): string {
+  if (min < 60) return `${min} minutos`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  const hLabel = h === 1 ? '1 hora' : `${h} horas`;
+  return m === 0 ? hLabel : `${h} h ${m} min`;
+}
 
 interface SleepTimerModalProps {
   visible: boolean;
@@ -12,6 +21,7 @@ interface SleepTimerModalProps {
 
 export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [selectedMin, setSelectedMin] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -36,12 +46,14 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
     }, 1000);
 
     setRemainingMs(minutes * 60 * 1000);
+    setSelectedMin(minutes);
     onClose();
   };
 
   const cancelTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setRemainingMs(null);
+    setSelectedMin(null);
   };
 
   const formatRemaining = (ms: number) => {
@@ -72,39 +84,54 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
       )}
 
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', padding: 24 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-              <Ionicons name="moon" size={22} color={palette.accent} />
-              <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700', marginLeft: 10 }}>Sleep Timer</Text>
-              <TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto', padding: 4 }}>
-                <Ionicons name="close" size={22} color={palette.textMuted} />
-              </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={1} onPress={onClose}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+        >
+          <TouchableOpacity
+            activeOpacity={1} onPress={() => {}}
+            style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', paddingBottom: 16 }}
+          >
+            <View style={{ alignItems: 'center', paddingTop: 10 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surface3 }} />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 }}>
+              <Ionicons name="moon" size={18} color={palette.accent} />
+              <Text style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700', marginLeft: 10 }}>Temporizador de apagado</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-              {SLEEP_TIMER_OPTIONS_MINUTES.map(min => (
+            <ScrollView style={{ maxHeight: 380 }} bounces={false}>
+              {SLEEP_TIMER_OPTIONS_MINUTES.map(min => {
+                const selected = selectedMin === min && remainingMs !== null;
+                return (
+                  <TouchableOpacity
+                    key={min} onPress={() => startTimer(min)}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 }}
+                    accessibilityRole="button" accessibilityLabel={formatMinutes(min)}
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={{ flex: 1, color: selected ? palette.accent : palette.textPrimary, fontSize: 15, fontWeight: selected ? '700' : '500' }}>
+                      {formatMinutes(min)}
+                    </Text>
+                    {selected && <Ionicons name="checkmark" size={20} color={palette.accent} />}
+                  </TouchableOpacity>
+                );
+              })}
+              {remainingMs !== null && (
                 <TouchableOpacity
-                  key={min} onPress={() => startTimer(min)}
-                  style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: palette.surface2, minWidth: 80, alignItems: 'center' }}
-                  accessibilityRole="button" accessibilityLabel={`${min} minutos`}
+                  onPress={() => { cancelTimer(); onClose(); }}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}
+                  accessibilityRole="button"
                 >
-                  <Text style={{ color: palette.textPrimary, fontWeight: '600', fontSize: 15 }}>{min}m</Text>
+                  <Text style={{ flex: 1, color: palette.error, fontSize: 15, fontWeight: '600' }}>
+                    Desactivar temporizador
+                  </Text>
+                  <Text style={{ color: palette.textMuted, fontSize: 13 }}>{formatRemaining(remainingMs)}</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-
-            {remainingMs !== null && (
-              <TouchableOpacity
-                onPress={cancelTimer}
-                style={{ paddingVertical: 14, borderRadius: 12, backgroundColor: palette.error + '22', alignItems: 'center', borderWidth: 1, borderColor: palette.error }}
-                accessibilityRole="button"
-              >
-                <Text style={{ color: palette.error, fontWeight: '600' }}>Cancelar timer ({formatRemaining(remainingMs)})</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+              )}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </>
   );
