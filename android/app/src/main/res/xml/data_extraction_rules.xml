@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) backup/transfer rules.
+
+  Goal: never lose the user's organization (playlists, playlist order,
+  favorites, hidden/archived songs, settings) when the app is reinstalled or
+  moved to a new device. That data lives in:
+    • databases/watermelon.db (+ -wal/-shm)  → WatermelonDB: playlists & order
+    • databases/RKStorage                     → AsyncStorage: favorites, hidden…
+    • shared_prefs/                           → misc native prefs
+  All of these are included by Auto Backup by default; we only exclude volatile
+  caches. The whole databases/ dir is captured together so SQLite WAL files stay
+  consistent on restore. Music files themselves are re-scanned from the device.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="cache" />
+        <exclude domain="external" path="cache" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="cache" />
+        <exclude domain="external" path="cache" />
+    </device-transfer>
+</data-extraction-rules>

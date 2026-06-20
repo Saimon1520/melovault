@@ -14,7 +14,14 @@ export async function PlaybackService() {
   // ── Notification / hardware button controls ──────────────────────────────
   TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
-  TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.stop());
+  // The notification "stop" (square) button: behave like Spotify/YT Music's
+  // stop/close — persist the exact position so the song can resume later, then
+  // reset (not just stop) so playback ends AND the media notification is
+  // dismissed, instead of lingering in a stopped state.
+  TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    await savePositionNow(true);
+    await TrackPlayer.reset();
+  });
   TrackPlayer.addEventListener(Event.RemoteNext, () => TrackPlayer.skipToNext());
   TrackPlayer.addEventListener(Event.RemotePrevious, () => TrackPlayer.skipToPrevious());
   TrackPlayer.addEventListener(Event.RemoteSeek, (event) => TrackPlayer.seekTo(event.position));

@@ -6,6 +6,7 @@ import TrackPlayer, {
   type Track,
 } from 'react-native-track-player';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FadeController } from '@/infrastructure/audio/FadeController';
 import type { Song, RepeatMode, PlaybackSpeed } from '@/shared/types';
 
 // Read persisted settings before the zustand store has hydrated (setup runs at
@@ -101,23 +102,53 @@ export class TrackPlayerService {
 
   async play(song: Song, positionMs = 0): Promise<void> {
     const track = this.songToTrack(song);
+    // Snap volume back to the user's level: a crossfade fade-out from the
+    // outgoing track could otherwise leave the new one momentarily silent,
+    // which reads as "it didn't play".
+    await FadeController.getInstance().reset();
     await TrackPlayer.reset();
     await TrackPlayer.add(track);
     if (positionMs > 0) {
       await TrackPlayer.seekTo(positionMs / 1000);
     }
     await TrackPlayer.play();
+    this.assertPlaying();
   }
 
   async setQueue(songs: Song[], startIndex = 0, positionMs = 0): Promise<void> {
     const tracks = songs.map(s => this.songToTrack(s));
+    await FadeController.getInstance().reset();
     await TrackPlayer.reset();
     await TrackPlayer.add(tracks);
-    await TrackPlayer.skip(startIndex);
-    if (positionMs > 0) {
-      await TrackPlayer.seekTo(positionMs / 1000);
+    // skip(index, initialTime) moves to the start track AND seeks in one native
+    // call. Skipping to index 0 is a no-op move, so only issue it when we
+    // actually need to change index or seek — a redundant skip(0) re-prepares
+    // the source and can race the play() below (the old "tap twice to play" bug).
+    if (startIndex > 0 || positionMs > 0) {
+      await TrackPlayer.skip(startIndex, positionMs > 0 ? positionMs / 1000 : 0);
     }
     await TrackPlayer.play();
+    this.assertPlaying();
+  }
+
+  // RNTP can occasionally drop the first play() issued right after reset()/add()
+  // on slower devices — the command lands before ExoPlayer finishes preparing
+  // the freshly-added source, so nothing starts and the user had to tap again.
+  // Re-assert play once shortly after, but only if we're not already starting,
+  // so this never fights a deliberate pause. Fire-and-forget: callers don't wait.
+  private assertPlaying(): void {
+    setTimeout(async () => {
+      try {
+        const { state } = await TrackPlayer.getPlaybackState();
+        const starting =
+          state === State.Playing ||
+          state === State.Buffering ||
+          state === State.Loading;
+        if (!starting) await TrackPlayer.play();
+      } catch {
+        // ignore — best-effort safety net
+      }
+    }, 250);
   }
 
   // Replaces the tracks AFTER the current one without interrupting playback —
