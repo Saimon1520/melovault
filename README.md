@@ -6,6 +6,37 @@ MeloVault es un reproductor de música para dispositivos móviles diseñado con 
 
 ---
 
+## 📥 Descarga (Android)
+
+**[⬇️ Descargar la última versión (APK)](https://github.com/Saimon1520/melovault/releases/latest)**
+
+Enlace directo al APK:
+
+```
+https://github.com/Saimon1520/melovault/releases/download/v1.0.0/app-release.apk
+```
+
+| | |
+|---|---|
+| **Versión** | v1.0.0 (estable) |
+| **Tamaño** | ~49 MB |
+| **Requisitos** | Android 7.0+ (API 24), ARM (arm64-v8a / armeabi-v7a) |
+| **Todas las versiones** | [Página de releases](https://github.com/Saimon1520/melovault/releases) |
+
+### Cómo instalar
+
+1. Descarga el **APK** desde el enlace de arriba.
+2. Ábrelo en tu teléfono. La primera vez, Android pedirá permitir **«instalar apps de origen desconocido»** — actívalo para tu navegador/gestor de archivos (es normal para apps fuera de Play Store).
+3. Toca **Instalar** y listo.
+
+### Actualizaciones
+
+Cuando salga una versión nueva, solo descarga e instala el nuevo APK **encima** de la app actual. Android dirá **«Actualizar»** y **conserva todos tus datos** — playlists, posiciones guardadas, favoritos y ajustes se mantienen intactos. No necesitas desinstalar.
+
+> 💡 Para recibir avisos automáticos de nuevas versiones puedes usar [Obtainium](https://github.com/ImranR98/Obtainium) apuntando al repositorio de releases.
+
+---
+
 ## ✨ Características
 
 ### Reproducción de Audio
@@ -166,7 +197,7 @@ WatermelonDB (SQLite) con las siguientes tablas:
 ### Instalación
 
 ```bash
-git clone https://github.com/saimonvargas/melovault.git
+git clone https://github.com/Saimon1520/melovault.git
 cd melovault
 pnpm install
 ```
