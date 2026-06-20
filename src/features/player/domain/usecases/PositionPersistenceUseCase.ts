@@ -39,6 +39,34 @@ export function skipNextTrackChangeSave(): void {
   skipNextTrackChangeSaveFlag = true;
 }
 
+// Live playback position tracked from the progress stream (fires ~every 1s,
+// also in the background). When the notification "stop" fires, the native player
+// has already reset its position to 0, so getPosition() returns 0 there; we use
+// this remembered value instead — extrapolated to "now" since it was advancing
+// in real time — to persist the EXACT second the user stopped at.
+let liveSec = 0;
+let liveAt = 0;
+let livePlaying = false;
+export function recordLivePosition(sec: number): void {
+  if (!Number.isFinite(sec) || sec < 0) return;
+  liveSec = sec;
+  liveAt = Date.now();
+  livePlaying = true;
+}
+export function markPlaybackNotPlaying(): void {
+  livePlaying = false;
+}
+export function getLivePositionSec(): number {
+  // While playing, the real position kept advancing since the last progress tick
+  // — add the elapsed wall-clock time (capped, 1x assumption) so we land on the
+  // actual second rather than up to ~1s behind.
+  if (livePlaying && liveAt > 0) {
+    const dt = (Date.now() - liveAt) / 1000;
+    if (dt > 0 && dt < 3) return liveSec + dt;
+  }
+  return liveSec;
+}
+
 // The periodic save is only a crash/kill backup — graceful exits (pause,
 // app-background, track change, stop) force-save the exact position, so this
 // cadence can be relaxed a lot to cut background DB/AsyncStorage writes (and the

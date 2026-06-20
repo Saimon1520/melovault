@@ -1,5 +1,5 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
-import { savePositionOnTrackChange, savePositionNow, skipNextTrackChangeSave } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { savePositionOnTrackChange, savePositionNow, skipNextTrackChangeSave, recordLivePosition, markPlaybackNotPlaying, getLivePositionSec } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { usePlayerStore } from '@/features/player/store/playerStore';
@@ -14,20 +14,21 @@ export async function PlaybackService() {
   // ── Notification / hardware button controls ──────────────────────────────
   TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
-  // The notification "stop" (square) button. We deliberately DON'T save here:
-  // by the time this event fires the player may have already moved to a
-  // different queue item, so reading the position now persists the WRONG
-  // song/second (the bug where reopening showed another song / an older time).
-  // The exact position is already saved continuously — by the progress events
-  // and, crucially, by the AppState 'background' force-save that runs the moment
-  // the app leaves the foreground (which always precedes a notification tap). So
-  // we only dismiss the notification: reset() clears the player (→ STOPPED/empty,
-  // removed immediately thanks to grace=0) and the session is reloaded from the
-  // saved state when the app next comes to the foreground (Providers' AppState
-  // 'active' handler). Suppress reset()'s own track-change save, whose
-  // lastPosition can be stale and would otherwise clobber the good value.
+  // The notification "stop" (square) button. The native STOP action only emits
+  // this event (MediaSessionCallback.STOP → BUTTON_STOP); it does NOT mutate the
+  // player, so the active track is still the real one here — we save the EXACT
+  // current position (the song keeps advancing in the background after the app
+  // is hidden, so the earlier background force-save can be a few seconds stale).
+  // Then suppress reset()'s own track-change save (its lastPosition is stale and
+  // would clobber what we just saved) and reset() to dismiss the notification
+  // immediately (grace=0). reset() empties the player; the session is reloaded
+  // from the saved state when the app next foregrounds (Providers' 'active').
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     const hadTrack = (await TrackPlayer.getActiveTrack())?.id != null;
+    // getPosition() is already 0 here (STOP reset the native player), so persist
+    // the last live position from the progress stream instead — that's the exact
+    // second the user was at.
+    await savePositionNow(true, getLivePositionSec());
     if (hadTrack) skipNextTrackChangeSave();
     await TrackPlayer.reset();
   });
@@ -81,12 +82,17 @@ export async function PlaybackService() {
   // pause (then app close) would lose the last few seconds before the pause.
   TrackPlayer.addEventListener(Event.PlaybackState, (e) => {
     if (e.state === State.Paused) savePositionNow(true);
+    // Stop extrapolating the live position once playback isn't advancing.
+    if (e.state !== State.Playing) markPlaybackNotPlaying();
   });
 
   // ── Crossfade: fade the current track out as it approaches its end ───────
   // (fires every `progressUpdateEventInterval` seconds). The next track is
   // faded back in by the track-changed handler above.
   TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (e) => {
+    // Remember the live position every tick (cheap, in-memory) so the "stop"
+    // button can persist the exact second even though getPosition() is 0 by then.
+    recordLivePosition(e.position);
     // Persist the position from here too: this event keeps firing while the app
     // is in the background (the playback service stays alive), so the saved
     // position tracks the real playback closely (throttled internally).
