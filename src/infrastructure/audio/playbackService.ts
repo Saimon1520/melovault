@@ -1,5 +1,5 @@
 import TrackPlayer, { Event, State } from 'react-native-track-player';
-import { savePositionOnTrackChange, savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { savePositionOnTrackChange, savePositionNow, skipNextTrackChangeSave } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
 import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { usePlayerStore } from '@/features/player/store/playerStore';
@@ -14,12 +14,21 @@ export async function PlaybackService() {
   // ── Notification / hardware button controls ──────────────────────────────
   TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
-  // The notification "stop" (square) button: behave like Spotify/YT Music's
-  // stop/close — persist the exact position so the song can resume later, then
-  // reset (not just stop) so playback ends AND the media notification is
-  // dismissed, instead of lingering in a stopped state.
+  // The notification "stop" (square) button. We deliberately DON'T save here:
+  // by the time this event fires the player may have already moved to a
+  // different queue item, so reading the position now persists the WRONG
+  // song/second (the bug where reopening showed another song / an older time).
+  // The exact position is already saved continuously — by the progress events
+  // and, crucially, by the AppState 'background' force-save that runs the moment
+  // the app leaves the foreground (which always precedes a notification tap). So
+  // we only dismiss the notification: reset() clears the player (→ STOPPED/empty,
+  // removed immediately thanks to grace=0) and the session is reloaded from the
+  // saved state when the app next comes to the foreground (Providers' AppState
+  // 'active' handler). Suppress reset()'s own track-change save, whose
+  // lastPosition can be stale and would otherwise clobber the good value.
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
-    await savePositionNow(true);
+    const hadTrack = (await TrackPlayer.getActiveTrack())?.id != null;
+    if (hadTrack) skipNextTrackChangeSave();
     await TrackPlayer.reset();
   });
   TrackPlayer.addEventListener(Event.RemoteNext, () => TrackPlayer.skipToNext());
