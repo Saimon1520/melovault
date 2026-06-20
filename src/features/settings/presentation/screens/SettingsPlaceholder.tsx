@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/design-system/tokens/colors';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { SEEK_SECONDS_OPTIONS } from '@/shared/constants/audioFormats';
+import { CompactSelector } from '@/shared/components/CompactSelector';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { HiddenSongsModal } from './HiddenSongsModal';
 import type { PlaybackSpeed, Song } from '@/shared/types';
@@ -44,27 +45,16 @@ function SettingRow({ label, description, children, stacked }: { label: string; 
   );
 }
 
-function ChipSelector<T extends string | number>({ options, value, onChange, format }: {
-  options: T[]; value: T; onChange: (v: T) => void; format?: (v: T) => string;
+function ChipSelector<T extends string | number>({ options, value, onChange, format, title }: {
+  options: T[]; value: T; onChange: (v: T) => void; format?: (v: T) => string; title?: string;
 }) {
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-      {options.map(opt => (
-        <TouchableOpacity
-          key={String(opt)}
-          onPress={() => onChange(opt)}
-          style={{
-            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-            backgroundColor: value === opt ? palette.accentSoft : palette.surface2,
-            borderWidth: 1, borderColor: value === opt ? palette.accent : 'transparent',
-          }}
-        >
-          <Text style={{ color: value === opt ? palette.accent : palette.textMuted, fontSize: 13 }}>
-            {format ? format(opt) : String(opt)}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+    <CompactSelector
+      value={value}
+      options={options.map(o => ({ value: o, label: format ? format(o) : String(o) }))}
+      onChange={onChange}
+      title={title}
+    />
   );
 }
 
@@ -121,8 +111,9 @@ export function SettingsPlaceholder() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         <SectionHeader title="REPRODUCCIÓN" />
         <View style={{ borderRadius: 14, overflow: 'hidden', marginHorizontal: 16 }}>
-          <SettingRow stacked label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">
+          <SettingRow label="Retroceso / Avance" description="Segundos al tocar ↺ ↻">
             <ChipSelector
+              title="Retroceso / Avance"
               options={[...SEEK_SECONDS_OPTIONS]}
               value={seekSeconds}
               onChange={setSeekSeconds}
@@ -130,8 +121,9 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow stacked label="Velocidad predeterminada">
+          <SettingRow label="Velocidad predeterminada">
             <ChipSelector
+              title="Velocidad predeterminada"
               options={SPEEDS}
               value={defaultSpeed}
               onChange={setDefaultSpeed}
@@ -147,8 +139,9 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow stacked label="Fundido entre canciones" description="Baja el volumen al final de una canción y sube el de la siguiente. No se superponen (un solo reproductor de audio).">
+          <SettingRow label="Fundido entre canciones" description="Baja el volumen al final de una canción y sube el de la siguiente. No se superponen (un solo reproductor de audio).">
             <ChipSelector
+              title="Fundido entre canciones"
               options={[0, 2000, 4000, 6000, 8000, 10000, 12000]}
               value={crossfadeMs}
               onChange={setCrossfadeMs}
@@ -156,8 +149,9 @@ export function SettingsPlaceholder() {
             />
           </SettingRow>
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginLeft: 20 }} />
-          <SettingRow stacked label="Al sonar una notificación" description="Qué hacer cuando otra app reproduce un sonido. Aplica al reiniciar.">
+          <SettingRow label="Al sonar una notificación" description="Qué hacer cuando otra app reproduce un sonido. Aplica al reiniciar.">
             <ChipSelector
+              title="Al sonar una notificación"
               options={['pause', 'duck'] as const}
               value={interruptionMode}
               onChange={setInterruptionMode}
