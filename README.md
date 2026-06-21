@@ -45,14 +45,15 @@ Cuando salga una versión nueva, solo descarga e instala el nuevo APK **encima**
 - **Retroceder y avanzar** X segundos (configurable: 5, 10, 15, 30s)
 - Slider de progreso con vista previa de seek
 - Control de **velocidad de reproducción** (0.5x — 2.0x)
-- **Crossfade / fade in / fade out** configurable entre canciones
+- **Fundido (crossfade) / fade in / fade out** configurable entre canciones
 - **Sleep timer** (apagado automático tras N minutos)
 - Controles en la **notificación**, pantalla bloqueada y auriculares Bluetooth
+- Manejo de **interrupciones** configurable (pausar o atenuar) y opción de **seguir sonando en reuniones/llamadas**
 
 ### 🗂️ Organización
 - **Biblioteca** completa: Canciones, Álbumes, Artistas, Géneros
 - **Gestión de playlists** y **cola (queue)** dinámica
-- Modo **Shuffle** (aleatorio) y **Repeat** (uno / todos / ninguno)
+- Modo **Shuffle** (aleatorio) y **Repeat** (uno / todos / ninguno), con mensajes de ayuda que explican cada modo (desactivables)
 - Búsqueda rápida en toda la biblioteca
 - Ordenamiento por: título, artista, álbum, duración, fecha, reproducciones
 - **Ocultar** o **eliminar** canciones con confirmación de seguridad
@@ -73,8 +74,14 @@ Cuando salga una versión nueva, solo descarga e instala el nuevo APK **encima**
 - Extracción automática de **artwork incrustado** + asignación manual de portadas
 
 ### 🎚️ Audio Avanzado
-- **Equalizer de 5 bandas** con presets (Rock, Pop, Jazz, Clásica, Bass Boost, Vocal…) y presets personalizados
+- **Equalizer de 5 bandas** nativo que aplica los cambios **en tiempo real** sobre la canción que suena: presets (Rock, Pop, Jazz, Clásica, Bass Boost, Vocal…), banda **personalizada** ajustable a mano y opción de **recordar los ajustes** entre sesiones
 - Transmisión a **dispositivos Bluetooth** (A2DP) con selector de salida integrado
+
+### 🎨 Interfaz y Personalización
+- **Tema claro, oscuro o según el sistema**, con selector dentro de la app
+- **Selectores compactos estilo Spotify** para velocidad, temporizador, tema y demás ajustes
+- UI **adaptable a vertical y horizontal** y a pantallas grandes (tablets), respetando las barras de gestos del sistema
+- Color de acento **extraído del artwork** del álbum en reproducción
 
 ---
 
@@ -156,6 +163,25 @@ Cada feature sigue: `domain/` (entidades + casos de uso), `data/` (repositorios)
 | `equalizer_presets` | Presets de ecualizador |
 | `settings` | Configuración general |
 
+## Módulos nativos (Android)
+
+Algunas funciones usan módulos nativos propios (en `android/app/src/main/java/com/melovault/`):
+
+| Módulo | Propósito |
+|--------|-----------|
+| `AudioControlModule` / `AudioEffects` | **Equalizer** nativo de 5 bandas (`android.media.audiofx.Equalizer`) enganchado a la sesión de audio de ExoPlayer; también lista dispositivos de salida y controla el volumen del sistema |
+| `AudioMetadataModule` | Extracción de tags y artwork incrustado al importar |
+
+El enganche del Equalizer se hace desde un **patch de react-native-track-player**
+(`patches/react-native-track-player@4.1.2.patch`), que pasa el `audioSessionId`
+de ExoPlayer a `AudioEffects` por reflexión.
+
+> ⚠️ **Builds release (R8/minify):** como el EQ se alcanza por **reflexión**, R8
+> no debe ofuscar ni eliminar esas clases. `proguard-rules.pro` mantiene
+> `com.melovault.**` y `com.doublesymmetry.kotlinaudio.**`; el manifest declara
+> `MODIFY_AUDIO_SETTINGS` (sin él, el `Equalizer` lanza excepción). Si el EQ
+> "se ve pero no suena" en release, revisa esas tres cosas (logcat, tag `MeloVaultEQ`).
+
 ## Desarrollo
 
 **Requisitos:** Node.js 18+, pnpm 8+, Java 17+ y Android Studio (o Xcode para iOS).
@@ -178,10 +204,11 @@ No se requieren API keys: LRCLib es gratuito y sin autenticación. Para publicar
 
 ## 🎨 Design System
 
-Sistema **dark-first** con extracción dinámica de color del artwork:
+Sistema con **temas claro / oscuro / según el sistema** (oscuro por defecto) y extracción dinámica de color del artwork:
 
-- **Fondo**: `#0E0E16` — negro profundo que hace el artwork protagonista
+- **Fondo (oscuro)**: `#0E0E16` — negro profundo que hace el artwork protagonista
 - **Acento**: `#7C5CFC` — violeta vibrante, overrideable por el color dominante del álbum
+- **Tema**: paleta resuelta en runtime vía `useTheme()` (`design-system/`); todos los componentes leen tokens, sin colores hardcodeados
 - **Grid**: base de 4px — todo el espaciado es múltiplo de 4
 - **Contraste**: texto primario 16.4:1 (supera WCAG AAA)
 
@@ -193,9 +220,10 @@ Sistema **dark-first** con extracción dinámica de color del artwork:
 - ✅ Playlists, cola, shuffle / repeat, búsqueda
 - ✅ Memoria de posición por canción + persistencia selectiva por playlist
 - ✅ Letras sincronizadas (LRCLib) + editor manual
-- ✅ Equalizer, crossfade / fade, sleep timer
+- ✅ Equalizer en tiempo real, fundido / fade, sleep timer
 - ✅ Bluetooth (A2DP) + selector de salida
-- ✅ Soporte de tablets y orientación
+- ✅ Temas claro / oscuro / sistema con selector en la app
+- ✅ UI adaptable a vertical y horizontal, tablets y barras de gestos
 
 **Roadmap (futuro):**
 - [ ] Edición de metadatos/tags desde la app
