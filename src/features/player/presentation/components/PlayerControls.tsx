@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay } from 'react-native-reanimated';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay, withTiming, runOnJS, type SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerControls } from '../hooks/usePlayerControls';
 import { useTheme } from '@/design-system/useTheme';
+import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import type { RepeatMode } from '@/shared/types';
 
 const REPEAT_ICONS: Record<RepeatMode, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -12,6 +13,16 @@ const REPEAT_ICONS: Record<RepeatMode, React.ComponentProps<typeof Ionicons>['na
   all: 'repeat',
   one: 'repeat-sharp',
 };
+
+// Tiny explanatory bubbles shown above the shuffle/repeat buttons when toggled,
+// so the two repeat modes (whole list vs. single song) aren't a mystery.
+const REPEAT_HINTS: Record<RepeatMode, { title: string; desc: string }> = {
+  none: { title: 'Repetir desactivado', desc: 'Al terminar la lista, la reproducción se detiene.' },
+  all: { title: 'Repetir lista', desc: 'Al acabar la última canción, vuelve a la primera.' },
+  one: { title: 'Repetir canción', desc: 'Repite una y otra vez solo la canción actual.' },
+};
+
+interface Hint { title: string; desc: string; side: 'left' | 'right'; }
 
 function ControlButton({
   icon,
@@ -50,6 +61,27 @@ function ControlButton({
   );
 }
 
+function HintBubble({ hint, opacity, palette }: { hint: Hint; opacity: SharedValue<number>; palette: ReturnType<typeof useTheme> }) {
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[style, {
+        position: 'absolute', bottom: '100%', marginBottom: 8, width: 220,
+        ...(hint.side === 'right' ? { right: 0 } : { left: 0 }),
+        backgroundColor: palette.surface3, borderRadius: 12, overflow: 'hidden',
+        paddingHorizontal: 12, paddingVertical: 8,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 6,
+      }]}
+    >
+      {/* flexShrink + flexWrap so long text wraps INSIDE the bubble instead of
+          spilling past the rounded background. */}
+      <Text style={{ color: palette.textPrimary, fontSize: 12, fontWeight: '700', flexShrink: 1, flexWrap: 'wrap' }}>{hint.title}</Text>
+      <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 2, lineHeight: 15, flexShrink: 1, flexWrap: 'wrap' }}>{hint.desc}</Text>
+    </Animated.View>
+  );
+}
+
 export function PlayerControls() {
   const palette = useTheme();
   const {
@@ -57,6 +89,38 @@ export function PlayerControls() {
     togglePlayPause, skipToNext, skipToPrevious,
     seekBackward, seekForward, toggleShuffle, cycleRepeat,
   } = usePlayerControls();
+
+  // Auto-hiding explanatory bubble for the shuffle/repeat buttons.
+  const [hint, setHint] = useState<Hint | null>(null);
+  const hintOpacity = useSharedValue(0);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+
+  const flashHint = useCallback((next: Hint) => {
+    if (!useSettingsStore.getState().showControlHints) return;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setHint(next);
+    hintOpacity.value = withTiming(1, { duration: 140 });
+    hideTimer.current = setTimeout(() => {
+      hintOpacity.value = withTiming(0, { duration: 280 }, (finished) => {
+        if (finished) runOnJS(setHint)(null);
+      });
+    }, 2600);
+  }, [hintOpacity]);
+
+  const onShuffle = useCallback(() => {
+    const next = !shuffleEnabled;
+    toggleShuffle();
+    flashHint(next
+      ? { title: 'Aleatorio activado', desc: 'Reproduce las canciones en orden aleatorio.', side: 'left' }
+      : { title: 'Aleatorio desactivado', desc: 'Vuelve al orden original de la lista.', side: 'left' });
+  }, [shuffleEnabled, toggleShuffle, flashHint]);
+
+  const onRepeat = useCallback(() => {
+    const next: RepeatMode = repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none';
+    cycleRepeat();
+    flashHint({ ...REPEAT_HINTS[next], side: 'right' });
+  }, [repeatMode, cycleRepeat, flashHint]);
 
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
@@ -104,18 +168,19 @@ export function PlayerControls() {
         <ControlButton icon="play-skip-forward" onPress={skipToNext} size={28} color={palette.textSecondary} />
       </View>
 
-      {/* Shuffle & Repeat row */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+      {/* Shuffle & Repeat row — `relative` so the hint bubble can sit above it */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, position: 'relative' }}>
+        {hint && <HintBubble hint={hint} opacity={hintOpacity} palette={palette} />}
         <ControlButton
           icon={shuffleEnabled ? 'shuffle' : 'shuffle-outline'}
-          onPress={toggleShuffle}
+          onPress={onShuffle}
           size={20}
           active={shuffleEnabled}
           color={palette.textMuted}
         />
         <ControlButton
           icon={REPEAT_ICONS[repeatMode]}
-          onPress={cycleRepeat}
+          onPress={onRepeat}
           size={20}
           active={repeatMode !== 'none'}
           color={palette.textMuted}

@@ -18,8 +18,11 @@ object AudioEffects {
   // Gains in millibels, indexed per band. Null until the EQ has been queried.
   private var gains: ShortArray? = null
 
+  private const val TAG = "MeloVaultEQ"
+
   @Synchronized
   fun attachSession(newSessionId: Int) {
+    android.util.Log.i(TAG, "attachSession($newSessionId) — prev=$sessionId, hasEq=${equalizer != null}")
     if (newSessionId == 0 || newSessionId == sessionId && equalizer != null) {
       sessionId = newSessionId
       return
@@ -33,7 +36,7 @@ object AudioEffects {
       equalizer?.release()
     } catch (_: Exception) {}
     equalizer = null
-    if (sessionId == 0) return
+    if (sessionId == 0) { android.util.Log.w(TAG, "rebuild skipped — sessionId is 0"); return }
     try {
       val eq = Equalizer(1000 /* high priority */, sessionId)
       eq.enabled = enabled
@@ -47,8 +50,10 @@ object AudioEffects {
         }
       }
       equalizer = eq
-    } catch (_: Exception) {
+      android.util.Log.i(TAG, "Equalizer CREATED ok — bands=${eq.numberOfBands}, enabled=${eq.enabled}, session=$sessionId")
+    } catch (e: Exception) {
       equalizer = null
+      android.util.Log.e(TAG, "Equalizer creation FAILED for session=$sessionId", e)
     }
   }
 
@@ -72,7 +77,8 @@ object AudioEffects {
     enabled = value
     try {
       equalizer?.enabled = value
-    } catch (_: Exception) {}
+      android.util.Log.i(TAG, "setEnabled($value) — eq=${if (equalizer != null) "present" else "NULL"}")
+    } catch (e: Exception) { android.util.Log.e(TAG, "setEnabled failed", e) }
   }
 
   @Synchronized
@@ -93,13 +99,15 @@ object AudioEffects {
   @Synchronized
   fun setGains(values: IntArray) {
     gains = ShortArray(values.size) { values[it].toShort() }
-    val eq = equalizer ?: return
+    val eq = equalizer
+    if (eq == null) { android.util.Log.w(TAG, "setGains(${values.joinToString()}) — eq is NULL, ignored"); return }
     try {
       val range = eq.bandLevelRange
       for (i in 0 until minOf(values.size, eq.numberOfBands.toInt())) {
         eq.setBandLevel(i.toShort(), values[i].toShort().coerceIn(range[0], range[1]))
       }
-    } catch (_: Exception) {}
+      android.util.Log.i(TAG, "setGains applied: ${values.joinToString()} (range ${range[0]}..${range[1]})")
+    } catch (e: Exception) { android.util.Log.e(TAG, "setGains failed", e) }
   }
 
   data class EqInfo(

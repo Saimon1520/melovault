@@ -71,6 +71,7 @@ export function SettingsPlaceholder() {
     defaultSpeed, setDefaultSpeed,
     playDuringMeetings, setPlayDuringMeetings,
     interruptionMode, setInterruptionMode,
+    showControlHints, setShowControlHints,
   } = useSettingsStore();
 
   const songRepoRef = useRef<SongRepository | null>(null);
@@ -186,6 +187,14 @@ export function SettingsPlaceholder() {
               value={playDuringMeetings} onValueChange={toggleMeetings}
               trackColor={{ false: palette.surface3, true: palette.accentDim }}
               thumbColor={playDuringMeetings ? palette.accent : palette.textMuted}
+            />
+          </SettingRow>
+          <View style={{ height: 1, backgroundColor: palette.glass10, marginLeft: 20 }} />
+          <SettingRow label="Mensajes de ayuda" description="Muestra una nota breve sobre el botón de aleatorio y de repetir al tocarlos.">
+            <Switch
+              value={showControlHints} onValueChange={setShowControlHints}
+              trackColor={{ false: palette.surface3, true: palette.accentDim }}
+              thumbColor={showControlHints ? palette.accent : palette.textMuted}
             />
           </SettingRow>
         </View>

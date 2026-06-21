@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/design-system/useTheme';
 
 export interface SelectorOption<T> {
@@ -31,8 +32,13 @@ export function CompactSelector<T extends string | number>({
   value, options, onChange, title, icon, triggerLabel, minTriggerWidth,
 }: CompactSelectorProps<T>) {
   const palette = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: winH } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const current = options.find(o => o.value === value);
+  // Cap the list so the whole sheet (handle + title + list + safe area) fits on
+  // screen — fixed 380 overflowed the top in landscape, where the screen is short.
+  const listMaxHeight = Math.min(380, Math.max(140, winH - 180 - insets.bottom));
 
   return (
     <>
@@ -58,14 +64,20 @@ export function CompactSelector<T extends string | number>({
             sheet don't close it. */}
         <TouchableOpacity
           activeOpacity={1} onPress={() => setOpen(false)}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+          style={{
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end',
+            // Respect side notches/gesture areas in landscape.
+            paddingLeft: insets.left, paddingRight: insets.right,
+          }}
         >
           <TouchableOpacity
             activeOpacity={1} onPress={() => {}}
             style={{
               backgroundColor: palette.surface1,
               borderTopLeftRadius: 20, borderTopRightRadius: 20,
-              width: '100%', maxWidth: 640, alignSelf: 'center', paddingBottom: 16,
+              width: '100%', maxWidth: 640, alignSelf: 'center',
+              // Clear the system gesture/nav bar so the last option isn't cut off.
+              paddingBottom: 16 + insets.bottom,
             }}
           >
             <View style={{ alignItems: 'center', paddingTop: 10 }}>
@@ -76,7 +88,7 @@ export function CompactSelector<T extends string | number>({
                 {title}
               </Text>
             )}
-            <ScrollView style={{ maxHeight: 380 }} bounces={false}>
+            <ScrollView style={{ maxHeight: listMaxHeight }} bounces={false}>
               {options.map(opt => {
                 const selected = opt.value === value;
                 return (

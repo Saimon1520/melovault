@@ -90,6 +90,17 @@ export class FadeController {
     });
   }
 
+  // Guarantee the track is audible again before resuming. A completed fade-out
+  // leaves `current` at 0 (with no timer and fadingOut already false), so a plain
+  // TrackPlayer.play() would resume SILENTLY — the "song plays but no sound until
+  // I switch tracks" bug. Snap back to the user's level unless a ramp is mid-flight.
+  async ensureAudible(): Promise<void> {
+    if (this.timer) return; // a deliberate fade is in progress — leave it alone
+    this.fadingOut = false;
+    this.current = this.baseVolume;
+    await TrackPlayer.setVolume(this.baseVolume).catch(() => {});
+  }
+
   // Cancel any ramp and snap back to the user's level (manual skip / seek).
   async reset(): Promise<void> {
     this.stop();

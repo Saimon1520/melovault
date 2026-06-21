@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/design-system/useTheme';
 import { SLEEP_TIMER_OPTIONS_MINUTES } from '@/shared/constants/audioFormats';
 
@@ -21,6 +22,9 @@ interface SleepTimerModalProps {
 
 export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
   const palette = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: winH } = useWindowDimensions();
+  const listMaxHeight = Math.min(380, Math.max(140, winH - 180 - insets.bottom));
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [selectedMin, setSelectedMin] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -87,11 +91,14 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
         <TouchableOpacity
           activeOpacity={1} onPress={onClose}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+          style={{
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end',
+            paddingLeft: insets.left, paddingRight: insets.right,
+          }}
         >
           <TouchableOpacity
             activeOpacity={1} onPress={() => {}}
-            style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', paddingBottom: 16 }}
+            style={{ backgroundColor: palette.surface1, borderTopLeftRadius: 20, borderTopRightRadius: 20, width: '100%', maxWidth: 640, alignSelf: 'center', paddingBottom: 16 + insets.bottom }}
           >
             <View style={{ alignItems: 'center', paddingTop: 10 }}>
               <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surface3 }} />
@@ -101,7 +108,7 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
               <Text style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700', marginLeft: 10 }}>Temporizador de apagado</Text>
             </View>
 
-            <ScrollView style={{ maxHeight: 380 }} bounces={false}>
+            <ScrollView style={{ maxHeight: listMaxHeight }} bounces={false}>
               {SLEEP_TIMER_OPTIONS_MINUTES.map(min => {
                 const selected = selectedMin === min && remainingMs !== null;
                 return (

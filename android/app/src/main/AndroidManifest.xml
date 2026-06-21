@@ -24,6 +24,10 @@
   <!-- Wake lock — keeps CPU awake during background playback -->
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
+  <!-- Required to create the audiofx Equalizer (AudioEffect). Without it the
+       Equalizer constructor throws and the EQ silently has no audible effect. -->
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
   <!-- Auto-restart playback after device reboot -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 

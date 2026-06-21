@@ -20,7 +20,7 @@ import { useArchiveStore } from '@/features/library/store/archiveStore';
 import { usePositionMemoryStore } from '@/features/player/store/positionMemoryStore';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { shuffle } from '@/shared/utils/shuffle';
-import { shouldRememberPosition } from '@/features/player/domain/usecases/positionPolicy';
+import { resolveResumePosition } from '@/features/player/domain/usecases/resumePosition';
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { ArchivedSongsModal } from './ArchivedSongsModal';
 import type { Song, SortOrder } from '@/shared/types';
@@ -133,8 +133,8 @@ export function LibraryPlaceholder() {
     }
 
     // Only resume mid-track when this song opted into position memory (or
-    // inherits it from a playlist); otherwise start from the beginning.
-    const startPositionMs = (await shouldRememberPosition(song)) ? song.lastPosition : 0;
+    // inherits it from a playlist); a song left at its end restarts from 0.
+    const startPositionMs = await resolveResumePosition(song);
 
     setCurrentSong(song);
     setQueue(playQueue, startIndex, list);
