@@ -89,7 +89,7 @@ export async function PlaybackService() {
   // ── Crossfade: fade the current track out as it approaches its end ───────
   // (fires every `progressUpdateEventInterval` seconds). The next track is
   // faded back in by the track-changed handler above.
-  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (e) => {
+  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, async (e) => {
     // Remember the live position every tick (cheap, in-memory) so the "stop"
     // button can persist the exact second even though getPosition() is 0 by then.
     recordLivePosition(e.position);
@@ -102,7 +102,13 @@ export async function PlaybackService() {
     if (crossfadeMs <= 0 || !e.duration) return;
     const remainingMs = (e.duration - e.position) * 1000;
     if (remainingMs > 0 && remainingMs <= crossfadeMs && !fade.isFadingOut()) {
-      fade.fadeOut(remainingMs);
+      // Only crossfade when another track actually follows. Fading out the LAST
+      // track just leaves the player muted, so the next manual play of that song
+      // (which doesn't go through reset()/fade.reset()) would be silent.
+      const queue = await TrackPlayer.getQueue();
+      const idx = await TrackPlayer.getActiveTrackIndex();
+      const hasNext = idx != null && idx < queue.length - 1;
+      if (hasNext) fade.fadeOut(remainingMs);
     }
   });
 

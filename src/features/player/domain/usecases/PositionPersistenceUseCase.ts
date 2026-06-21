@@ -3,6 +3,7 @@ import { SongRepository } from '@/features/library/data/repositories/SongReposit
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
 import { usePlayerStore } from '@/features/player/store/playerStore';
 import { shouldRememberPosition, isRememberedNow, inheritsKeepPositionPlaylist } from './positionPolicy';
+import { isAtEnd } from './resumePosition';
 
 let songRepo: SongRepository | null = null;
 let playerStateRepo: PlayerStateRepository | null = null;
@@ -182,7 +183,11 @@ export async function restoreLastSession(): Promise<void> {
     // "…" options menu) has a song to act on after a cold start.
     usePlayerStore.getState().setCurrentSong(song);
 
-    const positionSec = (saved.position ?? 0) / 1000; // stored in ms
+    // A session saved at the very end of the song would otherwise restore right
+    // at the edge, so pressing play instantly hits "queue ended" — neither
+    // advancing nor restarting. Restore at 0 so play() restarts it cleanly.
+    const savedMs = saved.position ?? 0;
+    const positionSec = isAtEnd(savedMs, song.duration) ? 0 : savedMs / 1000; // stored in ms
 
     const queue = await TrackPlayer.getQueue();
     const trackIndex = queue.findIndex(t => t.id === saved.currentTrackId);

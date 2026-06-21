@@ -7,6 +7,7 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FadeController } from '@/infrastructure/audio/FadeController';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 import type { Song, RepeatMode, PlaybackSpeed } from '@/shared/types';
 
 // Read persisted settings before the zustand store has hydrated (setup runs at
@@ -114,6 +115,7 @@ export class TrackPlayerService {
     await FadeController.getInstance().reset();
     await TrackPlayer.reset();
     await TrackPlayer.add(track);
+    await this.reapplyRepeatMode();
     if (positionMs > 0) {
       await TrackPlayer.seekTo(positionMs / 1000);
     }
@@ -121,11 +123,19 @@ export class TrackPlayerService {
     this.assertPlaying();
   }
 
+  // TrackPlayer.reset() clears the queue and resets the repeat mode to Off, so
+  // the user's selected loop mode is lost whenever a new song/queue starts.
+  // Re-push it from the store after each reset so the loop button actually sticks.
+  private async reapplyRepeatMode(): Promise<void> {
+    await this.setRepeatMode(usePlayerStore.getState().repeatMode);
+  }
+
   async setQueue(songs: Song[], startIndex = 0, positionMs = 0): Promise<void> {
     const tracks = songs.map(s => this.songToTrack(s));
     await FadeController.getInstance().reset();
     await TrackPlayer.reset();
     await TrackPlayer.add(tracks);
+    await this.reapplyRepeatMode();
     // skip(index, initialTime) moves to the start track AND seeks in one native
     // call. Skipping to index 0 is a no-op move, so only issue it when we
     // actually need to change index or seek — a redundant skip(0) re-prepares
@@ -171,6 +181,9 @@ export class TrackPlayerService {
   }
 
   async resume(): Promise<void> {
+    // Make sure a prior fade-out didn't leave the volume parked at 0 — otherwise
+    // playback resumes silently until the user switches tracks.
+    await FadeController.getInstance().ensureAudible();
     await TrackPlayer.play();
   }
 

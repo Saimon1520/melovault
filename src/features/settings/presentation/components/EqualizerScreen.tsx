@@ -39,9 +39,18 @@ function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: 
   const palette = useTheme();
   const gainToY = (g: number) => ((GAIN_MAX - g) / (GAIN_MAX - GAIN_MIN)) * SLIDER_HEIGHT;
   const position = useSharedValue(gainToY(band.gain));
+  // True while the finger is down. The thumb is driven directly on the UI thread
+  // during a drag; the gain only round-trips to JS to update the audio + label.
+  // Without this guard the effect below would overwrite the live UI-thread
+  // position with the (rounded) prop value a frame later, snapping the thumb
+  // back behind the finger — the "lag" the user sees.
+  const dragging = useSharedValue(false);
 
-  // Keep the thumb in sync when the gain changes from outside (presets/reset).
-  React.useEffect(() => { position.value = gainToY(band.gain); }, [band.gain]);
+  // Keep the thumb in sync when the gain changes from OUTSIDE (presets/reset) —
+  // but never while the user is dragging this very slider.
+  React.useEffect(() => {
+    if (!dragging.value) position.value = gainToY(band.gain);
+  }, [band.gain]);
 
   // Drive the gain from the absolute touch Y (reliable — no delta drift), with a
   // 48px-wide hit area so the thin track is easy to grab.
@@ -54,9 +63,12 @@ function BandSlider({ band, onChange }: { band: EqualizerBand; onChange: (gain: 
   };
 
   const pan = Gesture.Pan().minDistance(0)
+    .onBegin(e => { dragging.value = true; setFromY(e.y); })
+    .onUpdate(e => setFromY(e.y))
+    .onFinalize(() => { dragging.value = false; });
+  const tap = Gesture.Tap()
     .onBegin(e => setFromY(e.y))
-    .onUpdate(e => setFromY(e.y));
-  const tap = Gesture.Tap().onBegin(e => setFromY(e.y));
+    .onFinalize(() => { dragging.value = false; });
   const gesture = Gesture.Race(pan, tap);
 
   const thumbStyle = useAnimatedStyle(() => ({ top: position.value - 12 }));
@@ -180,7 +192,7 @@ export function EqualizerScreen({ onClose }: { onClose: () => void }) {
   }, [enabled, selectedPreset, bands, setPersistEqualizer, setEqualizerState]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
       <ResponsivePane maxWidth={520}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 24 }}>
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Cerrar ecualizador">

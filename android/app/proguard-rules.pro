@@ -23,6 +23,18 @@
 # react-native-track-player
 -keep class com.doublesymmetry.trackplayer.** { *; }
 
+# kotlin-audio (bundled inside track-player, SEPARATE package). The EQ session
+# hook reflects BaseAudioPlayer.getExoPlayer() — R8 renamed that method
+# (observed: "EQ session hook failed: i1.c.getExoPlayer"), so keep it intact.
+-keep class com.doublesymmetry.kotlinaudio.** { *; }
+
+# MeloVault native modules. AudioEffects (the app-wide Equalizer) is reached by
+# REFLECTION from the patched track-player MusicService — Class.forName(
+# "com.melovault.AudioEffects") + getMethod("attachSession") + getField(
+# "INSTANCE"). R8 must not rename/strip these or the equalizer silently never
+# attaches to the audio session in release builds (EQ has no audible effect).
+-keep class com.melovault.** { *; }
+
 # react-native-fast-image
 -keep class com.dylanvann.fastimage.** { *; }
 

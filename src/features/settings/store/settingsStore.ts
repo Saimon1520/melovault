@@ -21,6 +21,10 @@ interface SettingsStore {
   // 'pause' fully pauses & resumes (default); 'duck' just lowers the volume.
   interruptionMode: 'pause' | 'duck';
 
+  // Show the small explanatory bubbles above the shuffle/repeat controls when
+  // they're toggled (what "repeat one" vs "repeat all" do, etc.).
+  showControlHints: boolean;
+
   // Equalizer persistence (opt-in). When on, the EQ enable state + band gains
   // are remembered and re-applied across app restarts.
   persistEqualizer: boolean;
@@ -36,6 +40,7 @@ interface SettingsStore {
   setShowAlbumArtBackground: (show: boolean) => void;
   setPlayDuringMeetings: (enabled: boolean) => void;
   setInterruptionMode: (mode: 'pause' | 'duck') => void;
+  setShowControlHints: (show: boolean) => void;
   setPersistEqualizer: (enabled: boolean) => void;
   setEqualizerState: (state: { enabled: boolean; preset: string; gains: number[] }) => void;
 }
@@ -51,6 +56,7 @@ export const useSettingsStore = create<SettingsStore>()(
       showAlbumArtBackground: true,
       playDuringMeetings: false,
       interruptionMode: 'pause',
+      showControlHints: true,
       persistEqualizer: false,
       equalizerEnabled: false,
       equalizerPreset: 'flat',
@@ -64,6 +70,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setShowAlbumArtBackground: (showAlbumArtBackground) => set({ showAlbumArtBackground }),
       setPlayDuringMeetings: (playDuringMeetings) => set({ playDuringMeetings }),
       setInterruptionMode: (interruptionMode) => set({ interruptionMode }),
+      setShowControlHints: (showControlHints) => set({ showControlHints }),
       setPersistEqualizer: (persistEqualizer) => set({ persistEqualizer }),
       setEqualizerState: ({ enabled, preset, gains }) =>
         set({ equalizerEnabled: enabled, equalizerPreset: preset, equalizerGains: gains }),

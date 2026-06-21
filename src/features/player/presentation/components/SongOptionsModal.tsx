@@ -116,7 +116,7 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: palette.surface0, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
        <ResponsivePane>
         {/* Song header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: palette.glass10 }}>
