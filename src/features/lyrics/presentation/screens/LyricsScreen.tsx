@@ -105,12 +105,12 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
   // the user's manual sync offset (online LRC is timed for another version).
   const offset = useLyricsOffsetStore(s => (sid ? s.offsets[sid] ?? 0 : 0));
   const setOffset = useLyricsOffsetStore(s => s.setOffset);
-  // Offset is a positive delay only (seconds the lyrics start later than the LRC).
-  const applyOffset = (ms: number) => { if (sid) setOffset(sid, Math.max(0, Math.round(ms))); };
+  const applyOffset = (ms: number) => { if (sid) setOffset(sid, Math.round(ms)); };
   const bumpOffset = (deltaMs: number) => applyOffset(offset + deltaMs);
   const resetOffset = () => { applyOffset(0); setOffsetText(''); };
   const commitOffsetText = (t: string) => {
-    const cleaned = t.replace(',', '.').replace(/[^0-9.]/g, ''); // digits + dot, no sign
+    // Allow optional leading minus, digits and one decimal point.
+    const cleaned = (t.replace(',', '.').match(/^-?\d*\.?\d*/) ?? [''])[0];
     setOffsetText(cleaned);
     const n = parseFloat(cleaned);
     if (Number.isFinite(n)) applyOffset(n * 1000);
@@ -301,7 +301,7 @@ export function LyricsScreen({ songId, onClose }: { songId?: string; onClose: ()
               onChangeText={commitOffsetText}
               onFocus={() => { offsetFocused.current = true; }}
               onBlur={() => { offsetFocused.current = false; setOffsetText(offset ? (offset / 1000).toString() : ''); }}
-              keyboardType="decimal-pad"
+              keyboardType="numeric"
               placeholder="0"
               placeholderTextColor={palette.textMuted}
               style={{ color: offset === 0 ? palette.textMuted : palette.accent, fontSize: 15, fontWeight: '700', minWidth: 38, textAlign: 'center', padding: 0 }}
