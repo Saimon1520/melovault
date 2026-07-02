@@ -99,7 +99,9 @@ export function SongOptionsModal({ song, visible, onClose, onSongDeleted, onSong
               onClose();
               onSongDeleted?.(song.id);
               ToastAndroid.show('Canción eliminada', ToastAndroid.SHORT);
-            } else if (result.code !== 'DELETE_DENIED') {
+            } else if (result.code === 'DELETE_DENIED') {
+              ToastAndroid.show('Eliminación cancelada o bloqueada. Desconecta el cable USB e intenta de nuevo.', ToastAndroid.LONG);
+            } else {
               ToastAndroid.show('No se pudo eliminar la canción', ToastAndroid.LONG);
             }
           },
