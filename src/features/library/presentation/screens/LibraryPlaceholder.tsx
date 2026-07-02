@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
   RefreshControl, ActivityIndicator, StatusBar, FlatList,
+  AppState, ToastAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +24,7 @@ import { shuffle } from '@/shared/utils/shuffle';
 import { resolveResumePosition } from '@/features/player/domain/usecases/resumePosition';
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { ArchivedSongsModal } from './ArchivedSongsModal';
+import { AutoScanUseCase } from '../../domain/usecases/AutoScanUseCase';
 import type { Song, SortOrder } from '@/shared/types';
 
 type Tab = 'songs' | 'albums' | 'artists' | 'genres';
@@ -35,6 +37,7 @@ const TABS: { key: Tab; label: string }[] = [
 
 const audioService = TrackPlayerService.getInstance();
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
+const autoScanUseCase = new AutoScanUseCase();
 
 interface SongGroup {
   key: string;
@@ -82,6 +85,7 @@ export function LibraryPlaceholder() {
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const { isScanning, scanProgress, startScan } = useLibraryScan();
+  const autoScanRunning = useRef(false);
   const activeTrack = useActiveTrack();
   const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
   // Re-derive archived split whenever the user archives/restores something.
@@ -118,6 +122,43 @@ export function LibraryPlaceholder() {
       prefetchLyrics();
     }
   }, [startScan, loadSongs]);
+
+  // Silent background scan: detects new audio files (count check first) and
+  // adds them automatically. No spinner — shows a toast only when songs are found.
+  const handleAutoScan = useCallback(async () => {
+    if (isScanning || autoScanRunning.current) return;
+    autoScanRunning.current = true;
+    try {
+      const added = await autoScanUseCase.execute();
+      if (added > 0) {
+        await loadSongs();
+        prefetchLyrics();
+        ToastAndroid.show(
+          `${added} canción${added === 1 ? '' : 'es'} nueva${added === 1 ? '' : 's'} detectada${added === 1 ? '' : 's'}`,
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch {
+      // Auto-scan failures are silent — the user can always scan manually.
+    } finally {
+      autoScanRunning.current = false;
+    }
+  }, [isScanning, loadSongs]);
+
+  // Run once on first mount (covers cold app launch).
+  useEffect(() => {
+    handleAutoScan();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-run whenever the app returns to the foreground (user downloaded songs,
+  // switched back to the app, etc.).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') handleAutoScan();
+    });
+    return () => sub.remove();
+  }, [handleAutoScan]);
 
   // Play `song` queueing from `list` (the currently visible set: the full
   // library, or a selected album/artist/genre). Respects shuffle.

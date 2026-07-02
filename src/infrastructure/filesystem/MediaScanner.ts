@@ -253,6 +253,94 @@ export class MediaScanner {
     return songs;
   }
 
+  // Delta scan: only returns songs whose filePath is not in `knownPaths`.
+  // Much faster than scanAllAudio when the library is mostly stable — metadata
+  // and artwork are fetched only for the new assets, not the whole library.
+  static async scanNewOnly(knownPaths: Set<string>): Promise<Partial<Song>[]> {
+    if (Platform.OS !== 'android') return [];
+
+    const permission = await MediaLibrary.requestPermissionsAsync();
+    if (permission.status !== 'granted') return [];
+
+    // Pre-build a set of known basenames for a quick O(1) pre-filter.
+    // This avoids calling the native MediaStore query for assets we definitely
+    // already have (common case: only a handful of new files).
+    const knownFilenames = new Set([...knownPaths].map(p => p.split('/').pop() ?? ''));
+
+    const allAssets: MediaLibrary.Asset[] = [];
+    let hasNextPage = true;
+    let after: string | undefined;
+    while (hasNextPage) {
+      const page = await MediaLibrary.getAssetsAsync({
+        mediaType: MediaLibrary.MediaType.audio,
+        after,
+        first: 200,
+        sortBy: [MediaLibrary.SortBy.default],
+      });
+      allAssets.push(...page.assets);
+      hasNextPage = page.hasNextPage;
+      after = page.endCursor;
+    }
+
+    // Pre-filter by filename: candidates are assets whose filename is NOT already
+    // known. False negatives are possible (two songs with the same filename in
+    // different folders) but acceptable — the user can always do a manual scan.
+    const candidates = allAssets.filter(a => !knownFilenames.has(a.filename));
+    if (candidates.length === 0) return [];
+
+    // Resolve real paths via native MediaStore to catch false-positive filename
+    // matches (e.g. two "01 - Intro.mp3" in different albums).
+    const candidateIds = candidates.map(a => a.id);
+    const meta = await fetchNativeMetadata(candidateIds);
+
+    const trulyNew = candidates.filter(a => {
+      const path = meta[a.id]?.filePath;
+      return !path || !knownPaths.has(path);
+    });
+    if (trulyNew.length === 0) return [];
+
+    const newIds = trulyNew.map(a => a.id);
+    const artwork = await fetchNativeArtwork(newIds);
+
+    const songs: Partial<Song>[] = [];
+    for (const asset of trulyNew) {
+      const extension = asset.filename.split('.').pop()?.toLowerCase() ?? '';
+      if (!SUPPORTED_AUDIO_FORMATS.includes(extension as any)) continue;
+
+      const m = meta[asset.id] ?? {};
+      let filePath = m.filePath;
+      if (!filePath) {
+        const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
+        filePath = assetInfo.localUri ?? asset.uri;
+      }
+      if (!filePath || knownPaths.has(filePath)) continue;
+
+      songs.push({
+        filePath,
+        title: m.title || this.cleanTitle(asset.filename),
+        artist: m.artist,
+        album: m.album,
+        albumArtist: m.albumArtist,
+        composer: m.composer,
+        genre: m.genre,
+        year: m.year,
+        trackNumber: m.trackNumber,
+        bitRate: m.bitRate,
+        fileSize: m.fileSize ?? 0,
+        duration: m.duration ?? Math.round(asset.duration * 1000),
+        artworkPath: artwork[asset.id],
+        artworkEmbedded: artwork[asset.id] != null,
+        createdAt: asset.creationTime,
+        updatedAt: asset.modificationTime,
+        isHidden: false,
+        playCount: 0,
+        lastPosition: 0,
+      });
+    }
+
+    return songs;
+  }
+
   private static cleanTitle(filename: string): string {
     return filename.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ').trim();
   }
