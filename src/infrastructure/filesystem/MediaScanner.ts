@@ -25,6 +25,7 @@ interface NativeAudioMeta {
 const AudioMetadata: {
   getByIds(ids: string[]): Promise<Record<string, NativeAudioMeta>>;
   extractArtwork(ids: string[]): Promise<Record<string, string>>;
+  extractArtworkByPaths(paths: string[]): Promise<Record<string, string>>;
 } | undefined = NativeModules.AudioMetadata;
 
 async function fetchNativeArtwork(ids: string[]): Promise<Record<string, string>> {
@@ -251,6 +252,46 @@ export class MediaScanner {
     }
 
     return songs;
+  }
+
+  // Re-extracts artwork for songs where the cached file is missing or stale.
+  // Returns a map songId → new artworkPath for every song that was refreshed.
+  // Songs with no embedded art are simply omitted.
+  static async refreshMissingArtwork(
+    songs: import('@/shared/types').Song[],
+  ): Promise<Record<string, string>> {
+    if (Platform.OS !== 'android' || !AudioMetadata?.extractArtworkByPaths) return {};
+
+    const { getInfoAsync } = await import('expo-file-system');
+
+    // Find songs that claim to have embedded art but whose file is gone.
+    const missing: import('@/shared/types').Song[] = [];
+    for (const song of songs) {
+      if (!song.artworkEmbedded) continue;
+      if (!song.artworkPath) {
+        missing.push(song);
+        continue;
+      }
+      try {
+        const info = await getInfoAsync(song.artworkPath);
+        if (!info.exists) missing.push(song);
+      } catch {
+        missing.push(song);
+      }
+    }
+
+    if (missing.length === 0) return {};
+
+    const paths = missing.map(s => s.filePath);
+    const extracted = await AudioMetadata.extractArtworkByPaths(paths);
+
+    // Map filePath → songId so we can return songId → artworkPath.
+    const result: Record<string, string> = {};
+    for (const song of missing) {
+      const newPath = extracted[song.filePath];
+      if (newPath) result[song.id] = newPath;
+    }
+    return result;
   }
 
   // Delta scan: only returns songs whose filePath is not in `knownPaths`.

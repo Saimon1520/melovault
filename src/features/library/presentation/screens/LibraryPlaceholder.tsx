@@ -123,20 +123,22 @@ export function LibraryPlaceholder() {
     }
   }, [startScan, loadSongs]);
 
-  // Silent background scan: detects new audio files (count check first) and
-  // adds them automatically. No spinner — shows a toast only when songs are found.
+  // Silent background scan: repairs missing artwork and detects new audio files.
+  // No spinner — shows a toast only when new songs are found.
   const handleAutoScan = useCallback(async () => {
     if (isScanning || autoScanRunning.current) return;
     autoScanRunning.current = true;
     try {
-      const added = await autoScanUseCase.execute();
-      if (added > 0) {
+      const { added, artworkRepaired } = await autoScanUseCase.execute();
+      if (added > 0 || artworkRepaired > 0) {
         await loadSongs();
-        prefetchLyrics();
-        ToastAndroid.show(
-          `${added} canción${added === 1 ? '' : 'es'} nueva${added === 1 ? '' : 's'} detectada${added === 1 ? '' : 's'}`,
-          ToastAndroid.SHORT,
-        );
+        if (added > 0) {
+          prefetchLyrics();
+          ToastAndroid.show(
+            `${added} canción${added === 1 ? '' : 'es'} nueva${added === 1 ? '' : 's'} detectada${added === 1 ? '' : 's'}`,
+            ToastAndroid.SHORT,
+          );
+        }
       }
     } catch {
       // Auto-scan failures are silent — the user can always scan manually.
