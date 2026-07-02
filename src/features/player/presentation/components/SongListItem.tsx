@@ -36,6 +36,7 @@ export const SongListItem = memo(function SongListItem({
       <View style={{ position: 'relative' }}>
         <ExpoImage
           source={song.artworkPath ? { uri: song.artworkPath } : DEFAULT_ARTWORK}
+          placeholder={DEFAULT_ARTWORK}
           style={{ width: 48, height: 48, borderRadius: 8 }}
         />
         {isPlaying && (
@@ -97,6 +98,7 @@ export const SongListItem = memo(function SongListItem({
   );
 }, (prev, next) =>
   prev.song.id === next.song.id &&
+  prev.song.artworkPath === next.song.artworkPath &&
   prev.isPlaying === next.isPlaying &&
   prev.hasPersistence === next.hasPersistence
 );

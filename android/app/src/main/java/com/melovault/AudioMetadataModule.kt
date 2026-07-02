@@ -147,25 +147,38 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
 
   /**
    * Extracts the embedded cover art for each MediaStore id, caches it as a JPEG
-   * in the app cache dir, and returns a map id -> "file://…/artwork/<id>.jpg".
-   * Ids with no embedded art are simply omitted (the UI falls back to the
-   * bundled default artwork). Already-cached files are reused.
+   * in the app FILES dir (permanent — never auto-cleared by Android), and returns
+   * a map id -> "file://…/artwork/<id>.jpg". Ids with no embedded art are omitted.
+   * Already-extracted files are reused. Old cache-dir files are migrated
+   * transparently on first access.
    */
   @ReactMethod
   fun extractArtwork(ids: ReadableArray, promise: Promise) {
     try {
       val result: WritableMap = Arguments.createMap()
       val resolver = reactApplicationContext.contentResolver
-      val dir = File(reactApplicationContext.cacheDir, "artwork")
-      if (!dir.exists()) dir.mkdirs()
+      val filesDir = File(reactApplicationContext.filesDir, "artwork")
+      if (!filesDir.exists()) filesDir.mkdirs()
+      val cacheDir = File(reactApplicationContext.cacheDir, "artwork")
 
       for (i in 0 until ids.size()) {
         val id = ids.getString(i) ?: continue
-        val out = File(dir, "$id.jpg")
+        val out = File(filesDir, "$id.jpg")
 
+        // Already in permanent storage — use it.
         if (out.exists() && out.length() > 0) {
           result.putString(id, "file://${out.absolutePath}")
           continue
+        }
+
+        // Migrate from old cache location if it's still there.
+        val old = File(cacheDir, "$id.jpg")
+        if (old.exists() && old.length() > 0) {
+          try {
+            old.copyTo(out, overwrite = true)
+            result.putString(id, "file://${out.absolutePath}")
+            continue
+          } catch (_: Exception) { /* fall through to re-extract */ }
         }
 
         val bmp = loadArtworkBitmap(resolver, id) ?: continue
@@ -184,6 +197,56 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
       promise.resolve(result)
     } catch (e: Exception) {
       promise.reject("AUDIO_ARTWORK_ERROR", e.message, e)
+    }
+  }
+
+  /**
+   * Re-extracts embedded artwork directly from audio file paths (no MediaStore
+   * ID needed). Used on startup to repair artwork for songs whose cached file
+   * was lost. Returns a map filePath -> "file://…/artwork/<hash>.jpg".
+   * Paths with no embedded art are omitted. Already-extracted files are reused.
+   */
+  @ReactMethod
+  fun extractArtworkByPaths(paths: ReadableArray, promise: Promise) {
+    try {
+      val result: WritableMap = Arguments.createMap()
+      val dir = File(reactApplicationContext.filesDir, "artwork")
+      if (!dir.exists()) dir.mkdirs()
+
+      for (i in 0 until paths.size()) {
+        val path = paths.getString(i) ?: continue
+        // Use a stable positive hash of the path as the cache key.
+        val key = (path.hashCode().toLong() and 0x7FFFFFFF).toString()
+        val out = File(dir, "p$key.jpg") // "p" prefix distinguishes from ID-keyed files
+
+        if (out.exists() && out.length() > 0) {
+          result.putString(path, "file://${out.absolutePath}")
+          continue
+        }
+
+        val retriever = MediaMetadataRetriever()
+        try {
+          retriever.setDataSource(path)
+          val bytes = retriever.embeddedPicture ?: continue
+          val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+          try {
+            FileOutputStream(out).use { fos ->
+              bmp.compress(Bitmap.CompressFormat.JPEG, 88, fos)
+            }
+            result.putString(path, "file://${out.absolutePath}")
+          } finally {
+            bmp.recycle()
+          }
+        } catch (_: Exception) {
+          // File has no embedded art or is unreadable — skip silently.
+        } finally {
+          try { retriever.release() } catch (_: Exception) {}
+        }
+      }
+
+      promise.resolve(result)
+    } catch (e: Exception) {
+      promise.reject("AUDIO_ARTWORK_PATHS_ERROR", e.message, e)
     }
   }
 

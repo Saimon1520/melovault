@@ -211,6 +211,20 @@ export class SongRepository {
     });
   }
 
+  async updateArtworkBatch(updates: { id: string; artworkPath: string }[]): Promise<void> {
+    if (updates.length === 0) return;
+    await database.write(async () => {
+      for (const { id, artworkPath } of updates) {
+        try {
+          const record = await this.collection.find(id);
+          await record.update(r => { r.artworkPath = artworkPath; });
+        } catch {
+          // Song might have been deleted between scan and update — skip.
+        }
+      }
+    });
+  }
+
   async updateLyrics(id: string, lyrics: string, lyricsSynced?: string): Promise<void> {
     await database.write(async () => {
       const record = await this.collection.find(id);
