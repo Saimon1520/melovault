@@ -4,9 +4,12 @@ import { FadeController } from '@/infrastructure/audio/FadeController';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { usePlayerStore } from '@/features/player/store/playerStore';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
+import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
+import { shuffle } from '@/shared/utils/shuffle';
 
 const fade = FadeController.getInstance();
 const songRepo = new SongRepository();
+const audioService = TrackPlayerService.getInstance();
 
 // Runs in a dedicated JS thread for background audio playback.
 // Registered in index.js via TrackPlayer.registerPlaybackService()
@@ -112,9 +115,29 @@ export async function PlaybackService() {
     }
   });
 
-  // ── Track end — advance queue ─────────────────────────────────────────────
+  // ── Queue end — loop forever instead of stopping ──────────────────────────
+  // This only fires in RepeatMode.Off ('none'): RepeatMode.Track/'one' and
+  // RepeatMode.Queue/'all' loop natively and never emit this event. The user
+  // wants playback to continue indefinitely until they stop it themselves, so
+  // we restart the whole set for another pass. When shuffle is on we re-shuffle
+  // the canonical order so every loop is a fresh sequence; otherwise we replay
+  // the same order. Only truly empty queues fall through to stop().
   TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
     await savePositionOnTrackChange();
-    await TrackPlayer.stop();
+
+    const { shuffleEnabled, originalQueue, queue, queueContextId, setQueue } =
+      usePlayerStore.getState();
+    const base = originalQueue.length > 0 ? originalQueue : queue;
+    if (base.length === 0) {
+      await TrackPlayer.stop();
+      return;
+    }
+
+    const nextOrder = shuffleEnabled ? shuffle(base) : base;
+    // Suppress the track-change save that reset() would trigger with the stale
+    // end-of-queue position, so it can't clobber the per-song resume points.
+    skipNextTrackChangeSave();
+    setQueue(nextOrder, 0, base, queueContextId);
+    await audioService.setQueue(nextOrder, 0, 0);
   });
 }

@@ -3,6 +3,7 @@ import { database } from '@/infrastructure/database/database';
 import { SongModel } from '@/infrastructure/database/models/SongModel';
 import type { Song, SortOrder, SortDirection } from '@/shared/types';
 import type { Result } from '@/shared/types';
+import { isAtEnd } from '@/features/player/domain/usecases/resumePosition';
 
 function modelToSong(m: SongModel): Song {
   return {
@@ -134,7 +135,13 @@ export class SongRepository {
   async updateLastPosition(id: string, positionMs: number): Promise<void> {
     await database.write(async () => {
       const record = await this.collection.find(id);
-      await record.update(r => { r.lastPosition = positionMs; });
+      // Never persist a position that sits at (or within END_GUARD_MS of) the
+      // end as a resume point. Replaying such a song would seek straight to the
+      // end and instantly fire "queue ended" — so it appears stuck/paused and
+      // won't advance or restart. Store 0 so every replay path (library, search,
+      // playlist, session restore, queue loop) starts it cleanly from the top.
+      const clamped = isAtEnd(positionMs, record.duration) ? 0 : positionMs;
+      await record.update(r => { r.lastPosition = clamped; });
     });
   }
 
