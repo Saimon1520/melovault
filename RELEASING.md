@@ -19,19 +19,66 @@ pedir instalar de cero), cada release debe cumplir 2 cosas:
 
 ## Pasos
 
+Hay **una sola release**, la etiqueta `v1.0.0`, que se reutiliza en cada
+actualización: se mueve la etiqueta al nuevo commit y se reemplaza el APK. No
+crees etiquetas nuevas.
+
 ```bash
-# 1) sube versionCode/versionName en android/app/build.gradle
+# 1) sube versionCode en android/app/build.gradle (obligatorio para actualizar
+#    in-place; versionName puede quedarse igual)
 # 2) compila el APK firmado
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 export ANDROID_HOME=$HOME/Android/Sdk
 cd android && ./gradlew assembleRelease
 # APK: android/app/build/outputs/apk/release/app-release.apk
 
-# 3) publica la release en GitHub
-gh release create v1.0.1 \
-  "android/app/build/outputs/apk/release/app-release.apk#melovault-v1.0.1.apk" \
-  --title "MeloVault v1.0.1" --target master --notes "Cambios…"
+# 3) sube el código y mueve la etiqueta al commit publicado
+git push origin master
+git tag -f v1.0.0 && git push origin -f v1.0.0
+
+# 4) reemplaza el APK de la release (--clobber no imprime nada si va bien)
+gh release upload v1.0.0 \
+  android/app/build/outputs/apk/release/app-release.apk --clobber
+
+# 5) actualiza las notas (ver la regla de abajo antes de escribirlas)
+gh release edit v1.0.0 --target master --notes-file notas.md
 ```
+
+El nombre del asset se queda en `app-release.apk`: el sufijo `#nombre.apk` para
+renombrarlo lo ignora la versión de `gh` instalada.
+
+### Las notas de la release son ACUMULATIVAS
+
+Como solo existe una release, su texto es el **escaparate de la app**: es lo
+único que lee alguien que llega a decidir si la descarga. Por eso las notas
+describen **todo lo que hace MeloVault**, y cada actualización **añade** sus
+funciones nuevas a esa descripción.
+
+**Nunca las reemplaces por un changelog del tipo "novedades de esta versión".**
+A quien no conoce la app, un changelog le habla de cambios respecto a una
+versión que nunca tuvo, y no le dice qué obtiene si la instala.
+
+Antes de publicar: lee las notas actuales (`gh release view v1.0.0`), integra lo
+nuevo en la sección de funciones que corresponda (Biblioteca · Reproducción ·
+Letras · Playlists y favoritos · Apariencia · Privacidad), conserva las
+instrucciones de descarga (primera instalación vs. actualización) y el pie con
+la identidad del build (versionCode, commit, sha256 del APK).
+
+### Verificación posterior
+
+```bash
+# el APK publicado es de verdad el que compilaste (descarga anónima)
+curl -sL -o /tmp/pub.apk \
+  https://github.com/Saimon1520/melovault/releases/download/v1.0.0/app-release.apk
+sha256sum /tmp/pub.apk android/app/build/outputs/apk/release/app-release.apk
+
+# y el que tiene el teléfono es el mismo (no hace falta root)
+adb shell sha256sum $(adb shell pm path com.melovault | sed 's/package://')
+```
+
+> **Publicar en GitHub NO actualiza tu teléfono.** Comprueba siempre la versión
+> que tiene el dispositivo antes de dar por bueno un arreglo:
+> `adb shell dumpsys package com.melovault | grep versionCode`
 
 En el teléfono, al abrir el nuevo APK Android dirá **"Actualizar"** y reemplaza
 la versión anterior conservando los datos (playlists, favoritos, letras, etc.).
