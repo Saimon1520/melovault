@@ -354,41 +354,55 @@ export function LibraryPlaceholder() {
         ))}
       </View>
 
-      {/* Ordering + download-date filter (song list only). Scrolls horizontally
-          so the long "Últimos 3 meses"-style labels can't push the row off the
-          edge of a phone screen. */}
+      {/* Ordering + download-date filter (song list only). The chips stay on one
+          row and the match count goes on its own line underneath, so applying a
+          filter never pushes a control off-screen: both chips fit unscrolled at
+          every label length, and clearing the filter drops the count line and
+          restores the original layout on its own. The ScrollView is only a
+          safety net for very narrow screens / large font settings. */}
       {activeTab === 'songs' && !isEmpty && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          // A horizontal ScrollView inside a flex column has no intrinsic
-          // height — without a fixed one it collapses and clips the chips.
-          style={{ height: CHIP_ROW_HEIGHT, flexGrow: 0, flexShrink: 0, marginBottom: 6 }}
-          contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 }}
-        >
-          <CompactSelector
-            value={sortMode}
-            options={SORT_OPTIONS}
-            onChange={setSortMode}
-            title="Ordenar por"
-            icon="swap-vertical"
-            triggerLabel={SORT_CHIP_LABEL[sortMode]}
-          />
-          <CompactSelector
-            value={dateFilter}
-            options={DATE_FILTER_OPTIONS}
-            onChange={setDateFilter}
-            title="Fecha de descarga"
-            icon="calendar-outline"
-            triggerLabel={dateFilter === 'all' ? 'Fecha' : undefined}
-          />
+        <View style={{ marginBottom: 6 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            // A horizontal ScrollView inside a flex column has no intrinsic
+            // height — without a fixed one it collapses and clips the chips.
+            style={{ height: CHIP_ROW_HEIGHT, flexGrow: 0, flexShrink: 0 }}
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 }}
+          >
+            <CompactSelector
+              value={sortMode}
+              options={SORT_OPTIONS}
+              onChange={setSortMode}
+              title="Ordenar por"
+              icon="swap-vertical"
+              triggerLabel={SORT_CHIP_LABEL[sortMode]}
+            />
+            <CompactSelector
+              value={dateFilter}
+              options={DATE_FILTER_OPTIONS}
+              onChange={setDateFilter}
+              title="Fecha de descarga"
+              icon="calendar-outline"
+              triggerLabel={dateFilter === 'all' ? 'Fecha' : undefined}
+            />
+          </ScrollView>
           {isFiltered && (
-            <Text style={{ color: palette.textMuted, fontSize: 12, marginRight: 8 }}>
-              {visibleSongs.length} {visibleSongs.length === 1 ? 'canción' : 'canciones'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingTop: 2 }}>
+              <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                {visibleSongs.length} {visibleSongs.length === 1 ? 'canción' : 'canciones'} en este rango
+              </Text>
+              <TouchableOpacity
+                onPress={() => setDateFilter('all')}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                accessibilityRole="button" accessibilityLabel="Quitar el filtro de fecha"
+              >
+                <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '600' }}>Quitar filtro</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </ScrollView>
+        </View>
       )}
 
       {/* Content */}
