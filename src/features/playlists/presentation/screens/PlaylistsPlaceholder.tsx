@@ -11,6 +11,7 @@ import { ThemedStatusBar } from '@/shared/components/ThemedStatusBar';
 import { PlaylistRepository } from '@/features/playlists/data/repositories/PlaylistRepository';
 import { PlaylistDetailScreen } from './PlaylistDetailScreen';
 import { FavoritesScreen } from './FavoritesScreen';
+import { RecentlyAddedScreen } from '@/features/library/presentation/screens/RecentlyAddedScreen';
 import { ResponsivePane } from '@/shared/components/ResponsivePane';
 import { useFavoritesStore } from '@/features/player/store/favoritesStore';
 import type { Playlist } from '@/shared/types';
@@ -177,6 +178,7 @@ export function PlaylistsPlaceholder() {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | undefined>();
   const [openPlaylist, setOpenPlaylist] = useState<Playlist | null>(null);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const favoritesCount = useFavoritesStore(s => s.favoriteIds.length);
 
   const loadPlaylists = useCallback(async () => {
@@ -231,6 +233,28 @@ export function PlaylistsPlaceholder() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
       </TouchableOpacity>
+      <View style={{ height: 1, marginLeft: 86, backgroundColor: palette.glass10 }} />
+
+      {/* Default, always-present "Recién agregadas" list — ranked by the file's
+          device download date (MediaStore DATE_ADDED), not by when MeloVault
+          first scanned it. */}
+      <TouchableOpacity
+        onPress={() => setShowRecent(true)}
+        style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}
+        accessibilityRole="button"
+        accessibilityLabel="Recién agregadas"
+      >
+        <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: palette.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="sparkles" size={24} color={palette.accent} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={{ color: palette.textPrimary, fontWeight: '600', fontSize: 16 }}>Recién agregadas</Text>
+          <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: 3 }}>
+            Lo último que descargaste al celular
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+      </TouchableOpacity>
       <View style={{ height: 1, marginLeft: 86, marginBottom: 4, backgroundColor: palette.glass10 }} />
 
       {playlists.length === 0 ? (
@@ -265,6 +289,8 @@ export function PlaylistsPlaceholder() {
       />
 
       <FavoritesScreen visible={showFavorites} onClose={() => setShowFavorites(false)} />
+
+      <RecentlyAddedScreen visible={showRecent} onClose={() => setShowRecent(false)} />
 
       <PlaylistDetailScreen
         playlist={openPlaylist}

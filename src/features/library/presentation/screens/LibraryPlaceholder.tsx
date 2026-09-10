@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, TextInput,
   RefreshControl, ActivityIndicator, StatusBar, FlatList,
-  AppState, ToastAndroid,
+  AppState, ToastAndroid, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,7 +25,14 @@ import { resolveResumePosition } from '@/features/player/domain/usecases/resumeP
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { ArchivedSongsModal } from './ArchivedSongsModal';
 import { AutoScanUseCase } from '../../domain/usecases/AutoScanUseCase';
-import type { Song, SortOrder } from '@/shared/types';
+import { backfillFileDates } from '../../domain/usecases/FileDateService';
+import {
+  SORT_OPTIONS, SORT_CHIP_LABEL, DATE_FILTER_OPTIONS, filterByDownloadDate, sortByDownloadDate,
+  getDownloadDate, formatDownloadDate, useDownloadDates,
+} from '../../domain/downloadDate';
+import { CompactSelector } from '@/shared/components/CompactSelector';
+import { useLibraryPrefsStore } from '../../store/libraryPrefsStore';
+import type { Song } from '@/shared/types';
 
 type Tab = 'songs' | 'albums' | 'artists' | 'genres';
 const TABS: { key: Tab; label: string }[] = [
@@ -36,6 +43,9 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const audioService = TrackPlayerService.getInstance();
+// Tall enough for a CompactSelector chip (13px label + 8px vertical padding)
+// with a little breathing room above and below.
+const CHIP_ROW_HEIGHT = 44;
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 const autoScanUseCase = new AutoScanUseCase();
 
@@ -79,7 +89,16 @@ export function LibraryPlaceholder() {
   const [selectedGroup, setSelectedGroup] = useState<SongGroup | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('title');
+  // Ordering + download-date window for the "Canciones" list. 'recent'/'oldest'
+  // are resolved client-side from the cached MediaStore DATE_ADDED, because that
+  // date lives in AsyncStorage (not a DB column) — see fileDateStore.
+  // Both live in a persisted store, so "always newest downloads first" survives
+  // app restarts until the user picks something else.
+  const sortMode = useLibraryPrefsStore(s => s.sortMode);
+  const setSortMode = useLibraryPrefsStore(s => s.setSortMode);
+  const dateFilter = useLibraryPrefsStore(s => s.dateFilter);
+  const setDateFilter = useLibraryPrefsStore(s => s.setDateFilter);
+  const downloadDates = useDownloadDates();
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
@@ -103,11 +122,18 @@ export function LibraryPlaceholder() {
   const loadSongs = useCallback(async () => {
     setLoading(true);
     // Load everything; the search is applied per-tab at render time (by song
-    // title, album, artist or genre depending on which tab is open).
-    setSongs(await repoRef.current!.getAll(sortOrder));
+    // title, album, artist or genre depending on which tab is open). The DB can
+    // only sort by its own columns, so the download-date orders come back
+    // title-sorted and get re-ordered below.
+    const loaded = await repoRef.current!.getAll(sortMode === 'artist' ? 'artist' : 'title');
+    setSongs(loaded);
     playlistRepoRef.current!.getKeepPositionSongIds().then(setKeepPosIds).catch(() => {});
     setLoading(false);
-  }, [sortOrder]);
+    // Learn each file's real device download date (MediaStore DATE_ADDED). Only
+    // hits the native module for songs it hasn't dated yet, so this is a no-op
+    // after the first run.
+    backfillFileDates(loaded).catch(() => {});
+  }, [sortMode]);
 
   // Reload on focus (not just mount) so changes made elsewhere — e.g. restoring
   // a hidden song from Settings — show up when returning to the library.
@@ -164,6 +190,15 @@ export function LibraryPlaceholder() {
 
   // Play `song` queueing from `list` (the currently visible set: the full
   // library, or a selected album/artist/genre). Respects shuffle.
+  // SongListItem is memoized on song identity and deliberately ignores onPress
+  // (the handler is a new arrow every render, so comparing it would defeat the
+  // memo on a long list). That means an already-mounted row can keep an onPress
+  // closure from an earlier render, capturing the list as it was THEN — tapping
+  // a search result or a date-filtered row would queue the pre-filter list.
+  // Reading the list through a ref makes even a stale closure use what's on
+  // screen right now.
+  const visibleSongsRef = useRef<Song[]>([]);
+
   const playFromList = useCallback(async (list: Song[], song: Song) => {
     const idx = list.findIndex(s => s.id === song.id);
     const shuffleEnabled = usePlayerStore.getState().shuffleEnabled;
@@ -216,8 +251,22 @@ export function LibraryPlaceholder() {
   const visibleSongs = useMemo(() => {
     const base = selectedGroup ? selectedGroup.songs : mainSongs;
     if (!selectedGroup && activeTab !== 'songs') return base; // group tabs use the group list
-    return query ? base.filter(s => s.title.toLowerCase().includes(query)) : base;
-  }, [selectedGroup, activeTab, mainSongs, query]);
+    let list = query ? base.filter(s => s.title.toLowerCase().includes(query)) : base;
+    // Download-date window, then download-date ordering (title/artist ordering
+    // already came sorted from the DB).
+    list = filterByDownloadDate(list, dateFilter, downloadDates);
+    if (sortMode === 'recent' || sortMode === 'oldest') {
+      list = sortByDownloadDate(list, sortMode, downloadDates);
+    }
+    return list;
+  }, [selectedGroup, activeTab, mainSongs, query, dateFilter, sortMode, downloadDates]);
+
+  // The date badge only earns its row space when the user is actually looking at
+  // the list through the download date.
+  const showDateBadge = sortMode === 'recent' || sortMode === 'oldest' || dateFilter !== 'all';
+  const isFiltered = dateFilter !== 'all';
+
+  visibleSongsRef.current = visibleSongs;
 
   const isEmpty = !loading && mainSongs.length === 0 && archivedSongs.length === 0 && !isScanning;
 
@@ -304,6 +353,43 @@ export function LibraryPlaceholder() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Ordering + download-date filter (song list only). Scrolls horizontally
+          so the long "Últimos 3 meses"-style labels can't push the row off the
+          edge of a phone screen. */}
+      {activeTab === 'songs' && !isEmpty && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          // A horizontal ScrollView inside a flex column has no intrinsic
+          // height — without a fixed one it collapses and clips the chips.
+          style={{ height: CHIP_ROW_HEIGHT, flexGrow: 0, flexShrink: 0, marginBottom: 6 }}
+          contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 }}
+        >
+          <CompactSelector
+            value={sortMode}
+            options={SORT_OPTIONS}
+            onChange={setSortMode}
+            title="Ordenar por"
+            icon="swap-vertical"
+            triggerLabel={SORT_CHIP_LABEL[sortMode]}
+          />
+          <CompactSelector
+            value={dateFilter}
+            options={DATE_FILTER_OPTIONS}
+            onChange={setDateFilter}
+            title="Fecha de descarga"
+            icon="calendar-outline"
+            triggerLabel={dateFilter === 'all' ? 'Fecha' : undefined}
+          />
+          {isFiltered && (
+            <Text style={{ color: palette.textMuted, fontSize: 12, marginRight: 8 }}>
+              {visibleSongs.length} {visibleSongs.length === 1 ? 'canción' : 'canciones'}
+            </Text>
+          )}
+        </ScrollView>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -399,7 +485,8 @@ export function LibraryPlaceholder() {
               song={item}
               isPlaying={activeTrack?.id === item.id}
               hasPersistence={persistentIds.has(item.id)}
-              onPress={(song) => playFromList(visibleSongs, song)}
+              dateLabel={showDateBadge ? formatDownloadDate(getDownloadDate(item, downloadDates)) : undefined}
+              onPress={(song) => playFromList(visibleSongsRef.current, song)}
               onLongPress={setSelectedSong}
             />
           )}
@@ -410,6 +497,19 @@ export function LibraryPlaceholder() {
               tintColor={palette.accent}
               colors={[palette.accent]}
             />
+          }
+          ListEmptyComponent={
+            isFiltered ? (
+              <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingTop: 48 }}>
+                <Ionicons name="calendar-outline" size={36} color={palette.accentSoft} />
+                <Text style={{ color: palette.textPrimary, fontSize: 15, fontWeight: '600', marginTop: 12 }}>
+                  Nada en ese rango
+                </Text>
+                <Text style={{ color: palette.textMuted, fontSize: 13, textAlign: 'center', marginTop: 6 }}>
+                  No descargaste canciones en ese periodo. Prueba con un rango más amplio.
+                </Text>
+              </View>
+            ) : null
           }
           ItemSeparatorComponent={() => (
             <View style={{ height: 1, marginLeft: 76, backgroundColor: palette.glass10 }} />
