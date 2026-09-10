@@ -50,6 +50,10 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
         MediaStore.Audio.Media.TRACK,
         MediaStore.Audio.Media.DURATION,
         MediaStore.Audio.Media.COMPOSER,
+        // When the file landed on the device (download date), not when
+        // MeloVault first scanned it. Both are epoch SECONDS in MediaStore.
+        MediaStore.Audio.Media.DATE_ADDED,
+        MediaStore.Audio.Media.DATE_MODIFIED,
       )
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         columns.add(MediaStore.Audio.Media.ALBUM_ARTIST)
@@ -87,6 +91,8 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
         val trackIdx = cursor.getColumnIndex(MediaStore.Audio.Media.TRACK)
         val durIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION)
         val composerIdx = cursor.getColumnIndex(MediaStore.Audio.Media.COMPOSER)
+        val addedIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
+        val modifiedIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED)
         val albumArtistIdx =
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
             cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ARTIST) else -1
@@ -134,6 +140,15 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
           if (bitrateIdx >= 0 && !cursor.isNull(bitrateIdx)) {
             map.putInt("bitRate", cursor.getInt(bitrateIdx))
           }
+          // MediaStore stores these in SECONDS — hand JS milliseconds.
+          if (addedIdx >= 0 && !cursor.isNull(addedIdx)) {
+            val added = cursor.getLong(addedIdx)
+            if (added > 0) map.putDouble("dateAdded", added * 1000.0)
+          }
+          if (modifiedIdx >= 0 && !cursor.isNull(modifiedIdx)) {
+            val modified = cursor.getLong(modifiedIdx)
+            if (modified > 0) map.putDouble("dateModified", modified * 1000.0)
+          }
 
           result.putMap(id, map)
         }
@@ -144,6 +159,95 @@ class AudioMetadataModule(reactContext: ReactApplicationContext) :
       promise.reject("AUDIO_METADATA_ERROR", e.message, e)
     }
   }
+
+  /**
+   * Returns, keyed by file path, when each audio file actually landed on the
+   * device: { dateAdded, dateModified } in epoch MILLISECONDS.
+   *
+   * `dateAdded` is MediaStore's DATE_ADDED — the moment the download/copy
+   * appeared in the media store, i.e. the real "downloaded on" date. That is
+   * deliberately NOT the same as MeloVault's own `created_at`, which only says
+   * when the library scan first noticed the file.
+   *
+   * Songs are matched by their DATA path because MeloVault stores file paths on
+   * its rows, not MediaStore ids. Files MediaStore doesn't know about fall back
+   * to the filesystem's own last-modified stamp so every song gets a date.
+   */
+  @ReactMethod
+  fun getFileDatesByPaths(paths: ReadableArray, promise: Promise) {
+    try {
+      val result: WritableMap = Arguments.createMap()
+
+      val pathList = ArrayList<String>(paths.size())
+      for (i in 0 until paths.size()) {
+        paths.getString(i)?.let { pathList.add(stripFileScheme(it)) }
+      }
+      if (pathList.isEmpty()) {
+        promise.resolve(result)
+        return
+      }
+
+      val resolver = reactApplicationContext.contentResolver
+      val columns = arrayOf(
+        MediaStore.Audio.Media.DATA,
+        MediaStore.Audio.Media.DATE_ADDED,
+        MediaStore.Audio.Media.DATE_MODIFIED,
+      )
+
+      // SQLite caps bound variables at ~999, so query in chunks.
+      val found = HashSet<String>()
+      pathList.chunked(400).forEach { chunk ->
+        val placeholders = chunk.joinToString(",") { "?" }
+        val selection = "${MediaStore.Audio.Media.DATA} IN ($placeholders)"
+        resolver.query(
+          MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+          columns,
+          selection,
+          chunk.toTypedArray(),
+          null,
+        )?.use { cursor ->
+          val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+          val addedIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
+          val modifiedIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED)
+          while (cursor.moveToNext()) {
+            val path = cursor.getString(dataIdx) ?: continue
+            val map: WritableMap = Arguments.createMap()
+            if (addedIdx >= 0 && !cursor.isNull(addedIdx)) {
+              val added = cursor.getLong(addedIdx)
+              if (added > 0) map.putDouble("dateAdded", added * 1000.0)
+            }
+            if (modifiedIdx >= 0 && !cursor.isNull(modifiedIdx)) {
+              val modified = cursor.getLong(modifiedIdx)
+              if (modified > 0) map.putDouble("dateModified", modified * 1000.0)
+            }
+            result.putMap(path, map)
+            found.add(path)
+          }
+        }
+      }
+
+      // Fallback for anything MediaStore has no row for (files outside the
+      // indexed volumes): use the file's own last-modified timestamp.
+      for (path in pathList) {
+        if (found.contains(path)) continue
+        val lastModified = try { File(path).lastModified() } catch (_: Exception) { 0L }
+        if (lastModified > 0) {
+          val map: WritableMap = Arguments.createMap()
+          map.putDouble("dateAdded", lastModified.toDouble())
+          map.putDouble("dateModified", lastModified.toDouble())
+          result.putMap(path, map)
+        }
+      }
+
+      promise.resolve(result)
+    } catch (e: Exception) {
+      promise.reject("AUDIO_FILE_DATES_ERROR", e.message, e)
+    }
+  }
+
+  /** MeloVault stores some paths as `file:///…` URIs; MediaStore.DATA is bare. */
+  private fun stripFileScheme(path: String): String =
+    if (path.startsWith("file://")) android.net.Uri.decode(path.removePrefix("file://")) else path
 
   /**
    * Extracts the embedded cover art for each MediaStore id, caches it as a JPEG

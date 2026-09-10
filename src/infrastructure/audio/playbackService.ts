@@ -6,6 +6,9 @@ import { usePlayerStore } from '@/features/player/store/playerStore';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { shuffle } from '@/shared/utils/shuffle';
+import {
+  ensureEndlessQueue, resetQueueLoopCheck, markProgressCheckDone, hasProgressCheckRun,
+} from '@/infrastructure/audio/queueLoop';
 
 const fade = FadeController.getInstance();
 const songRepo = new SongRepository();
@@ -78,6 +81,12 @@ export async function PlaybackService() {
     } else {
       await fade.reset();
     }
+
+    // Landed on the last track of the queue? Queue up the next lap NOW, while
+    // the service is still comfortably in the foreground, so playback never
+    // reaches a hard stop. See queueLoop.ts for why waiting for the end fails.
+    resetQueueLoopCheck();
+    await ensureEndlessQueue();
   });
 
   // ── Save the position the moment playback pauses ─────────────────────────
@@ -101,6 +110,14 @@ export async function PlaybackService() {
     // position tracks the real playback closely (throttled internally).
     savePositionNow();
 
+    // Second (and last) chance to extend the queue for this track, in case the
+    // track-change check ran before the store's queue was populated. Guarded so
+    // it costs one native queue read per song, not one per second.
+    if (!hasProgressCheckRun() && e.duration > 0 && e.duration - e.position <= 20) {
+      markProgressCheckDone();
+      ensureEndlessQueue();
+    }
+
     const crossfadeMs = useSettingsStore.getState().crossfadeMs;
     if (crossfadeMs <= 0 || !e.duration) return;
     const remainingMs = (e.duration - e.position) * 1000;
@@ -115,13 +132,14 @@ export async function PlaybackService() {
     }
   });
 
-  // ── Queue end — loop forever instead of stopping ──────────────────────────
-  // This only fires in RepeatMode.Off ('none'): RepeatMode.Track/'one' and
-  // RepeatMode.Queue/'all' loop natively and never emit this event. The user
-  // wants playback to continue indefinitely until they stop it themselves, so
-  // we restart the whole set for another pass. When shuffle is on we re-shuffle
-  // the canonical order so every loop is a fresh sequence; otherwise we replay
-  // the same order. Only truly empty queues fall through to stop().
+  // ── Queue end — FALLBACK loop ─────────────────────────────────────────────
+  // Normally unreachable: queueLoop.ts appends the next lap before the last
+  // track finishes, so the queue never actually ends. This stays as a safety net
+  // for the cases where that append couldn't run (store not populated yet, a
+  // native add() that failed…), rebuilding the set from scratch instead of
+  // stopping. It only fires in RepeatMode.Off ('none') — RepeatMode.Track/'one'
+  // and RepeatMode.Queue/'all' loop natively and never emit this event. Only
+  // truly empty queues fall through to stop().
   TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
     await savePositionOnTrackChange();
 

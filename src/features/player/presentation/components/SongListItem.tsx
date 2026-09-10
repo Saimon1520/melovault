@@ -12,12 +12,14 @@ interface SongListItemProps {
   song: Song;
   isPlaying?: boolean;
   hasPersistence?: boolean;
+  /** Download date badge, shown only when the list is ordered/filtered by it. */
+  dateLabel?: string;
   onPress: (song: Song) => void;
   onLongPress?: (song: Song) => void;
 }
 
 export const SongListItem = memo(function SongListItem({
-  song, isPlaying, hasPersistence, onPress, onLongPress,
+  song, isPlaying, hasPersistence, dateLabel, onPress, onLongPress,
 }: SongListItemProps) {
   const palette = useTheme();
   return (
@@ -66,6 +68,14 @@ export const SongListItem = memo(function SongListItem({
           {song.artist || 'Artista desconocido'}
           {song.album ? ` • ${song.album}` : ''}
         </Text>
+        {dateLabel ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+            <Ionicons name="download-outline" size={11} color={palette.textMuted} />
+            <Text style={{ color: palette.textMuted, fontSize: 11 }} numberOfLines={1}>
+              {dateLabel}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Position-memory marker */}
@@ -100,5 +110,6 @@ export const SongListItem = memo(function SongListItem({
   prev.song.id === next.song.id &&
   prev.song.artworkPath === next.song.artworkPath &&
   prev.isPlaying === next.isPlaying &&
-  prev.hasPersistence === next.hasPersistence
+  prev.hasPersistence === next.hasPersistence &&
+  prev.dateLabel === next.dateLabel
 );
