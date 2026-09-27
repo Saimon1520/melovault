@@ -89,6 +89,20 @@ export class SongRepository {
     }
   }
 
+  // Songs for the given ids, in that order; ids that no longer exist are dropped.
+  async getByIds(ids: string[]): Promise<Song[]> {
+    const unique = [...new Set(ids)];
+    const byId = new Map<string, Song>();
+    // Chunked so a whole-library queue stays well under SQLite's term limits.
+    for (let i = 0; i < unique.length; i += 500) {
+      const records = await this.collection
+        .query(Q.where('id', Q.oneOf(unique.slice(i, i + 500))))
+        .fetch();
+      records.forEach(m => byId.set(m.id, modelToSong(m)));
+    }
+    return ids.map(id => byId.get(id)).filter((s): s is Song => s != null);
+  }
+
   async getAll(sortOrder: SortOrder = 'title', sortDir: SortDirection = 'asc'): Promise<Song[]> {
     const records = await this.collection
       .query(

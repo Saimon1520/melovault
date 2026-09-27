@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, Modal, Alert, FlatList } from 'react-native';
 import TrackPlayer, { Track, useActiveTrack } from 'react-native-track-player';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { useTheme } from '@/design-system/useTheme';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 
 const DEFAULT_ARTWORK = require('@/assets/defaults/default-artwork.png');
 
@@ -29,40 +30,65 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
     if (visible) loadQueue();
   }, [visible, loadQueue]);
 
-  const playAt = async (index: number) => {
+  // Keep the highlighted row in sync when the song changes while the list is open.
+  useEffect(() => {
+    if (visible) loadQueue();
+  }, [activeTrack?.id, visible, loadQueue]);
+
+  // Every edit runs one at a time and then re-reads the player's real queue, so
+  // the list always shows what will actually play — a fast double tap can't
+  // apply a move to indices that already shifted.
+  const busy = useRef(false);
+  const runEdit = useCallback(async (edit: () => Promise<void>) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await edit();
+    } catch {
+      // fall through to the reload so the list never shows a stale order
+    } finally {
+      await loadQueue().catch(() => {});
+      busy.current = false;
+    }
+  }, [loadQueue]);
+
+  const playAt = (index: number) => runEdit(async () => {
     await TrackPlayer.skip(index);
     await TrackPlayer.play();
-    setActiveIndex(index);
-  };
+  });
 
-  const removeAt = async (index: number) => {
+  const removeAt = (index: number) => {
     if (index === activeIndex) {
       Alert.alert('No se puede eliminar', 'No puedes eliminar la canción que se está reproduciendo actualmente.');
       return;
     }
-    await TrackPlayer.remove(index);
-    setQueue(prev => prev.filter((_, i) => i !== index));
-    if (index < activeIndex) setActiveIndex(prev => prev - 1);
+    runEdit(() => TrackPlayer.remove(index));
   };
 
-  const moveUp = async (index: number) => {
+  // Moves one row and mirrors the edit into the store's queue, so it survives
+  // the next lap of the endless queue and a restart (the store is what both
+  // re-queue from).
+  const move = (index: number, direction: 'up' | 'down') => {
+    const to = direction === 'up' ? index - 1 : index + 1;
+    const songId = queue[index]?.id;
+    const neighborId = queue[to]?.id;
+    if (songId == null || neighborId == null) return;
+    runEdit(async () => {
+      await TrackPlayer.move(index, to);
+      if (String(songId) !== String(neighborId)) {
+        usePlayerStore.getState().moveSongInQueue(String(songId), String(neighborId), direction);
+      }
+    });
+  };
+
+  const moveUp = (index: number) => {
     if (index === 0) return;
-    await TrackPlayer.move(index, index - 1);
-    const newQueue = [...queue];
-    [newQueue[index]!, newQueue[index - 1]!] = [newQueue[index - 1]!, newQueue[index]!];
-    setQueue(newQueue);
-    if (activeIndex === index) setActiveIndex(index - 1);
-    else if (activeIndex === index - 1) setActiveIndex(index);
+    move(index, 'up');
   };
 
-  const moveDown = async (index: number) => {
+  const moveDown = (index: number) => {
     if (index >= queue.length - 1) return;
-    await TrackPlayer.move(index, index + 1);
-    const newQueue = [...queue];
-    [newQueue[index]!, newQueue[index + 1]!] = [newQueue[index + 1]!, newQueue[index]!];
-    setQueue(newQueue);
-    if (activeIndex === index) setActiveIndex(index + 1);
-    else if (activeIndex === index + 1) setActiveIndex(index);
+    move(index, 'down');
   };
 
   const clearQueue = () => {
@@ -70,12 +96,10 @@ export function QueueScreen({ visible, onClose }: QueueScreenProps) {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Limpiar', style: 'destructive',
-        onPress: async () => {
+        onPress: () => runEdit(async () => {
           const indicesToRemove = queue.map((_, i) => i).filter(i => i !== activeIndex);
           await TrackPlayer.remove(indicesToRemove);
-          setQueue(prev => prev.filter((_, i) => i === activeIndex));
-          setActiveIndex(0);
-        },
+        }),
       },
     ]);
   };
