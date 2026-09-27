@@ -49,10 +49,12 @@ Cuando salga una versión nueva, solo descarga e instala el nuevo APK **encima**
 - **Sleep timer** (apagado automático tras N minutos)
 - Controles en la **notificación**, pantalla bloqueada y auriculares Bluetooth
 - Manejo de **interrupciones** configurable (pausar o atenuar) y opción de **seguir sonando en reuniones/llamadas**
+- **Sigue sonando en segundo plano** aunque el teléfono tenga poca RAM, la pantalla esté apagada o el almacenamiento lleno; si Android cierra la app igual, al volver retoma la canción, el segundo y la cola completa
+- Avisa si el uso de batería de la app está en **"Restringido"** (Android cortaría la música) y lleva a los ajustes
 
 ### 🗂️ Organización
 - **Biblioteca** completa: Canciones, Álbumes, Artistas, Géneros
-- **Gestión de playlists** y **cola (queue)** dinámica
+- **Gestión de playlists** y **cola (queue)** dinámica y editable (subir, bajar, quitar); el orden manual se conserva en las siguientes vueltas y tras reiniciar
 - Modo **Shuffle** (aleatorio) y **Repeat** (uno / todos / ninguno), con mensajes de ayuda que explican cada modo (desactivables)
 - Búsqueda rápida en toda la biblioteca
 - Ordenamiento por: título, artista, álbum, duración, fecha, reproducciones
@@ -174,7 +176,11 @@ Algunas funciones usan módulos nativos propios (en `android/app/src/main/java/c
 
 El enganche del Equalizer se hace desde un **patch de react-native-track-player**
 (`patches/react-native-track-player@4.1.2.patch`), que pasa el `audioSessionId`
-de ExoPlayer a `AudioEffects` por reflexión.
+de ExoPlayer a `AudioEffects` por reflexión. El mismo parche mantiene el servicio
+de reproducción en **primer plano** mientras suena (para que Android no lo mate en
+segundo plano) y corrige el reordenamiento de la cola de kotlinaudio: ver
+[`src/infrastructure/audio/README_MEDIA_NOTIFICATION.md`](src/infrastructure/audio/README_MEDIA_NOTIFICATION.md),
+que también explica cómo probarlo simulando un teléfono de gama baja.
 
 > ⚠️ **Builds release (R8/minify):** como el EQ se alcanza por **reflexión**, R8
 > no debe ofuscar ni eliminar esas clases. `proguard-rules.pro` mantiene
@@ -217,7 +223,8 @@ Sistema con **temas claro / oscuro / según el sistema** (oscuro por defecto) y 
 **Versión actual: `v1.0.0` — estable y publicada.** Todas las funciones de arriba están implementadas y probadas en dispositivo:
 
 - ✅ Reproducción, biblioteca, metadatos y portadas
-- ✅ Playlists, cola, shuffle / repeat, búsqueda
+- ✅ Playlists, cola editable, shuffle / repeat, búsqueda
+- ✅ Reproducción en segundo plano robusta (poca RAM, Doze, disco lleno) con restauración de cola y posición
 - ✅ Memoria de posición por canción + persistencia selectiva por playlist
 - ✅ Letras sincronizadas (LRCLib) + editor manual
 - ✅ Equalizer en tiempo real, fundido / fade, sleep timer
