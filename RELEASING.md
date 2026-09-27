@@ -64,6 +64,34 @@ Letras · Playlists y favoritos · Apariencia · Privacidad), conserva las
 instrucciones de descarga (primera instalación vs. actualización) y el pie con
 la identidad del build (versionCode, commit, sha256 del APK).
 
+### Higiene del build (pnpm 11)
+
+pnpm 11 **ya no lee** `node-linker=hoisted` de `.npmrc`. Cualquier `pnpm install`
+(incluido el que hace `pnpm patch-commit`) deja `node_modules` con otra estructura:
+el build falla (`Cannot find module 'babel-preset-expo'`) o, peor, compila pero el
+APK sale **inflado con los íconos duplicados** (le pasó a vc18 antes de publicar:
+50,9 MB en vez de 48,8 MB). Después de tocar dependencias o el parche de RNTP:
+
+```bash
+rm -rf node_modules && CI=true pnpm install --config.node-linker=hoisted --frozen-lockfile
+git checkout pnpm-workspace.yaml     # patch-commit añade un "allowBuilds" de relleno
+rm -rf ~/tmp/metro-cache android/app/build/generated/assets android/app/build/generated/res
+cd android && ./gradlew assembleRelease
+# comprobación: 20 fuentes y ~48,8 MB (no 39 / ~51 MB)
+unzip -l app/build/outputs/apk/release/app-release.apk | grep -c '\.ttf'
+```
+
+Para editar el parche de RNTP:
+`pnpm patch react-native-track-player@4.1.2 --edit-dir <carpeta>` (ya trae el
+parche actual aplicado), editar y `pnpm patch-commit <carpeta>`; luego lo de arriba.
+
+### Probar la reproducción en segundo plano antes de publicar
+
+Si el cambio toca audio o el parche de RNTP, sigue la sección "Cómo probar como un
+teléfono de gama baja" de `src/infrastructure/audio/README_MEDIA_NOTIFICATION.md`.
+En el Honor de desarrollo hay que **quitar primero la exención de batería** de
+MeloVault (y restaurarla al final), o los bugs de primer plano no se reproducen.
+
 ### Verificación posterior
 
 ```bash
