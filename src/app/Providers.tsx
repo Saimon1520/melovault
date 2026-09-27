@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { restoreLastSession, startPositionPersistence, savePositionNow } from '@/features/player/domain/usecases/PositionPersistenceUseCase';
+import { startQueuePersistence } from '@/features/player/store/queuePersistence';
+import { warnIfBackgroundRestricted } from '@/infrastructure/audio/backgroundRestriction';
 import { prefetchLyrics } from '@/infrastructure/lyrics/LyricsPrefetchService';
 import { useSettingsStore } from '@/features/settings/store/settingsStore';
 import { OnboardingScreen } from '@/features/onboarding/presentation/screens/OnboardingScreen';
@@ -49,7 +51,9 @@ export function Providers({ children }: ProvidersProps) {
         // Restore last session
         await restoreLastSession();
         startPositionPersistence();
+        startQueuePersistence();
         setAppState('ready');
+        warnIfBackgroundRestricted();
 
         // Resume the background lyrics download for any songs still missing them
         // (e.g. if a previous run was interrupted). Delayed + best-effort.
@@ -76,6 +80,7 @@ export function Providers({ children }: ProvidersProps) {
         // session (song or persistence-playlist, at its saved position) so it's
         // there to resume. No-op when a track is already loaded.
         restoreLastSession();
+        warnIfBackgroundRestricted();
       }
     });
     return () => sub.remove();
@@ -85,6 +90,7 @@ export function Providers({ children }: ProvidersProps) {
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     await restoreLastSession();
     startPositionPersistence();
+    startQueuePersistence();
     setAppState('ready');
   };
 

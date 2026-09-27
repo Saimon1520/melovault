@@ -2,6 +2,9 @@ import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { SongRepository } from '@/features/library/data/repositories/SongRepository';
 import { PlayerStateRepository } from '@/infrastructure/database/PlayerStateRepository';
 import { usePlayerStore } from '@/features/player/store/playerStore';
+import { loadSavedQueue } from '@/features/player/store/queuePersistence';
+import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
+import type { Song } from '@/shared/types';
 import { shouldRememberPosition, isRememberedNow, inheritsKeepPositionPlaylist } from './positionPolicy';
 import { isAtEnd } from './resumePosition';
 
@@ -78,8 +81,7 @@ const SAVE_THROTTLE_MS = 5000;   // de-dupe the multiple triggers
 let saveIntervalId: ReturnType<typeof setInterval> | null = null;
 let lastSaveAt = 0;
 // Signature of the last persisted player state — skip the AsyncStorage write
-// when nothing changed (e.g. a non-remember song whose stored position stays 0,
-// so only a track/queue change is worth writing).
+// when nothing changed (e.g. paused, or the same throttled tick twice).
 let lastPlayerStateSig = '';
 
 // Persist the CURRENT position immediately. Called periodically (interval +
@@ -104,15 +106,18 @@ export async function savePositionNow(force = false, overridePositionSec?: numbe
     }
     const queueIndex = await TrackPlayer.getActiveTrackIndex() ?? 0;
     const savedPosition = remember ? positionMs : 0;
-    const sig = `${track.id}|${queueIndex}|${savedPosition}`;
-    // Skip redundant writes — for a non-remember song the stored position is
-    // pinned at 0, so the signature only changes when the track/queue does.
+    const { state } = await TrackPlayer.getPlaybackState();
+    const wasPlaying =
+      state === State.Playing || state === State.Buffering || state === State.Loading;
+    const sig = `${track.id}|${queueIndex}|${savedPosition}|${positionMs}|${wasPlaying}`;
     if (sig !== lastPlayerStateSig) {
       lastPlayerStateSig = sig;
       await repos().playerStateRepo.save({
         currentTrackId: track.id as string,
         position: savedPosition,
         queueIndex,
+        sessionPosition: positionMs,
+        wasPlaying,
       });
     }
   } catch {
@@ -161,6 +166,33 @@ export async function savePositionOnTrackChange(
 
 let restoring = false;
 
+// Rebuild the queue the user was playing (lost with the process) around `song`.
+// Returns false when there's no usable saved queue, so the caller falls back to
+// loading the single song.
+async function restoreSavedQueue(song: Song, positionSec: number): Promise<boolean> {
+  const saved = await loadSavedQueue();
+  if (!saved || saved.queueIds.length === 0) return false;
+  const songs = await repos().songRepo.getByIds(saved.queueIds);
+  const index = songs.findIndex(s => s.id === song.id);
+  if (index === -1) return false;
+  const original = saved.originalIds.length > 0
+    ? await repos().songRepo.getByIds(saved.originalIds)
+    : songs;
+
+  const store = usePlayerStore.getState();
+  store.setShuffleEnabled(saved.shuffle);
+  store.setQueue(songs, index, original, saved.contextId);
+
+  const audioService = TrackPlayerService.getInstance();
+  await TrackPlayer.add(songs.map(s => audioService.songToTrack(s)));
+  if (index > 0) {
+    await TrackPlayer.skip(index, positionSec);
+  } else if (positionSec > 0) {
+    await TrackPlayer.seekTo(positionSec);
+  }
+  return true;
+}
+
 export async function restoreLastSession(): Promise<void> {
   if (restoring) return; // guard against overlapping cold-start + foreground calls
   restoring = true;
@@ -183,16 +215,28 @@ export async function restoreLastSession(): Promise<void> {
     // "…" options menu) has a song to act on after a cold start.
     usePlayerStore.getState().setCurrentSong(song);
 
+    // Still marked as playing = the process died mid-song (Android reclaimed the
+    // RAM; a pause or stop would have saved wasPlaying=false). Pick up where it
+    // was instead of applying the "remember position" opt-in, which is about
+    // songs the user left on purpose.
+    const savedMs = saved.wasPlaying && saved.sessionPosition != null
+      ? saved.sessionPosition
+      : saved.position ?? 0;
     // A session saved at the very end of the song would otherwise restore right
     // at the edge, so pressing play instantly hits "queue ended" — neither
     // advancing nor restarting. Restore at 0 so play() restarts it cleanly.
-    const savedMs = saved.position ?? 0;
     const positionSec = isAtEnd(savedMs, song.duration) ? 0 : savedMs / 1000; // stored in ms
 
     const queue = await TrackPlayer.getQueue();
     const trackIndex = queue.findIndex(t => t.id === saved.currentTrackId);
 
-    if (trackIndex !== -1) {
+    // After a process death the player is empty: bring the whole queue back
+    // (already positioned on the saved song), not just the one song.
+    const queueRestored = queue.length === 0 && await restoreSavedQueue(song, positionSec);
+
+    if (queueRestored) {
+      // nothing else to load
+    } else if (trackIndex !== -1) {
       await TrackPlayer.skip(trackIndex);
     } else {
       await TrackPlayer.add({
@@ -205,7 +249,7 @@ export async function restoreLastSession(): Promise<void> {
         duration: song.duration,
       });
     }
-    if (positionSec > 0) await TrackPlayer.seekTo(positionSec);
+    if (positionSec > 0 && !queueRestored) await TrackPlayer.seekTo(positionSec);
     // Open restored but paused — the user decides when to resume.
     await TrackPlayer.pause();
   } catch {

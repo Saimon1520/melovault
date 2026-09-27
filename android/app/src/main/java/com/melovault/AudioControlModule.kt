@@ -135,6 +135,38 @@ class AudioControlModule(reactContext: ReactApplicationContext) :
     } catch (_: Exception) {}
   }
 
+  // ── Background playback ────────────────────────────────────────────────
+
+  // True when the user (or an OEM battery manager) set this app's battery usage
+  // to "Restricted": Android then stops our foreground service as soon as the app
+  // leaves the screen, so background music is cut and nothing in-app can prevent it.
+  @ReactMethod
+  fun isBackgroundRestricted(promise: Promise) {
+    try {
+      val am = reactApplicationContext.getSystemService(android.app.ActivityManager::class.java)
+      promise.resolve(
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P &&
+          am?.isBackgroundRestricted == true
+      )
+    } catch (_: Exception) {
+      promise.resolve(false)
+    }
+  }
+
+  // App info page: "Batería / Uso de batería" is one tap away there (there's no
+  // public intent straight to the per-app battery page).
+  @ReactMethod
+  fun openAppSettings() {
+    try {
+      val intent = Intent(
+        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        android.net.Uri.fromParts("package", reactApplicationContext.packageName, null)
+      )
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      reactApplicationContext.startActivity(intent)
+    } catch (_: Exception) {}
+  }
+
   private data class Kind(val id: String, val label: String)
 
   private fun deviceKind(type: Int): Kind? = when (type) {

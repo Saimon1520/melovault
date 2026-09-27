@@ -43,7 +43,9 @@ export class TrackPlayerService {
     const { playDuringMeetings, pauseOnInterruption } = await readAudioSettings();
 
     await TrackPlayer.setupPlayer({
-      maxCacheSize: 1024 * 5, // 5MB
+      // No maxCacheSize: every track is a local file, which RNTP never caches —
+      // the option only created an unused on-disk cache (and disk writes on
+      // phones with no free space).
       // autoHandleInterruptions: true → pause on headphone-disconnect and when
       // another app (call, alarm, meeting) takes audio focus. Disabled when the
       // user wants playback to continue over meetings.
@@ -58,11 +60,12 @@ export class TrackPlayerService {
         // notification, instead of just ducking the volume — unless the user
         // chose "duck" in settings.
         alwaysPauseOnInterruption: pauseOnInterruption,
-        // Remove the media notification IMMEDIATELY when playback stops. RNTP
-        // defaults this grace period to 5s (it's meant to let an app auto-queue
-        // related media after the queue ends), so the notification's "stop"
-        // button appeared to "take forever" to dismiss. We never auto-queue, so
-        // 0 = dismiss at once.
+        // Remove the media notification IMMEDIATELY when the user stops. RNTP
+        // defaults this grace period to 5s, so the notification's "stop" button
+        // appeared to "take forever" to dismiss. Our RNTP patch still keeps the
+        // service in the foreground for a few seconds on any OTHER background
+        // stop (seek, track gap, queue refill) — leaving it at once there is what
+        // let Android kill the app mid-song.
         stopForegroundGracePeriod: 0,
       },
 

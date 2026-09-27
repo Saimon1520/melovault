@@ -706,10 +706,99 @@ index b2409a09939164c49c0f7a16bb6d3284e8eab8fb..cf1fccac750c142e9691f11a16dc0131
      }
  }
 diff --git a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..db90840619e760b6991b70b69af925c6910855b1 100644
+index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..1775f17097db56af05e8bbca2d8c2bab885d01a7 100644
 --- a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 +++ b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-@@ -158,6 +158,32 @@ class MusicService : HeadlessJsTaskService() {
+@@ -9,6 +9,8 @@ import android.os.Binder
+ import android.os.Build
+ import android.os.Bundle
+ import android.os.IBinder
++import android.os.SystemClock
++import android.util.Log
+ import android.support.v4.media.RatingCompat
+ import androidx.annotation.MainThread
+ import androidx.core.app.NotificationCompat
+@@ -29,6 +31,7 @@ import com.doublesymmetry.trackplayer.module.MusicEvents
+ import com.doublesymmetry.trackplayer.module.MusicEvents.Companion.METADATA_PAYLOAD_KEY
+ import com.doublesymmetry.trackplayer.utils.BundleUtils
+ import com.doublesymmetry.trackplayer.utils.BundleUtils.setRating
++import com.doublesymmetry.trackplayer.utils.AppForegroundTracker
+ import com.facebook.react.HeadlessJsTaskService
+ import com.facebook.react.bridge.Arguments
+ import com.facebook.react.jstasks.HeadlessJsTaskConfig
+@@ -61,6 +64,15 @@ class MusicService : HeadlessJsTaskService() {
+     private var appKilledPlaybackBehavior = AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
+     private var stopForegroundGracePeriod: Int = DEFAULT_STOP_FOREGROUND_GRACE_PERIOD
+ 
++    // MeloVault: the media notification the service is (or should be) foregrounded
++    // with. Kept as fields (upstream kept them local to setupForegrounding) so a
++    // service restart can re-assert it instead of demoting the service.
++    private var fgNotificationId: Int? = null
++    private var fgNotification: Notification? = null
++    // When the user last pressed the notification's stop button: that stop must
++    // dismiss the notification at once, every other stop waits (see below).
++    private var userStopRequestedAt = 0L
++
+     val tracks: List<Track>
+         get() = player.items.map { (it as TrackAudioItem).track }
+ 
+@@ -95,10 +107,45 @@ class MusicService : HeadlessJsTaskService() {
+ 
+     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+         startTask(getTaskConfig(intent))
++        // MeloVault: a (re)start while music is playing — a Bluetooth/headset media
++        // button intent, a START_STICKY redelivery… — used to run the
++        // empty-notification workaround below, whose stopForeground() DEMOTED the
++        // live playback service out of the foreground. Playback carried on at
++        // cached-process priority (oom_adj 700 instead of 200) and was the first
++        // thing the low-memory killer took on a 4 GB phone. Re-assert the real
++        // media notification instead; that also satisfies startForegroundService().
++        if (::player.isInitialized && player.playWhenReady && startForegroundWithMediaNotification()) {
++            return START_STICKY
++        }
+         startAndStopEmptyNotificationToAvoidANR()
+         return START_STICKY
+     }
+ 
++    /** Foregrounds the service with the current media notification. */
++    private fun startForegroundWithMediaNotification(): Boolean {
++        val id = fgNotificationId ?: return false
++        val notification = fgNotification ?: return false
++        return try {
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++                startForeground(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
++            } else {
++                startForeground(id, notification)
++            }
++            true
++        } catch (error: Exception) {
++            Log.w("MeloVault", "startForeground failed", error)
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
++                error is ForegroundServiceStartNotAllowedException
++            ) {
++                emit(MusicEvents.PLAYER_ERROR, Bundle().apply {
++                    putString("message", error.message)
++                    putString("code", "android-foreground-service-start-not-allowed")
++                })
++            }
++            false
++        }
++    }
++
+     /**
+      * Workaround for the "Context.startForegroundService() did not then call Service.startForeground()"
+      * within 5s" ANR and crash by creating an empty notification and stopping it right after. For more
+@@ -144,6 +191,9 @@ class MusicService : HeadlessJsTaskService() {
+             interceptPlayerActionsTriggeredExternally = true,
+             handleAudioBecomingNoisy = true,
+             handleAudioFocus = playerOptions?.getBoolean(AUTO_HANDLE_INTERRUPTIONS) ?: false,
++            // MeloVault: hold a partial wake lock while playing so the CPU can't
++            // doze off under ExoPlayer's playback thread with the screen off.
++            wakeMode = WakeMode.LOCAL,
+             audioContentType = when(playerOptions?.getString(ANDROID_AUDIO_CONTENT_TYPE)) {
+                 "music" -> AudioContentType.MUSIC
+                 "speech" -> AudioContentType.SPEECH
+@@ -158,6 +208,32 @@ class MusicService : HeadlessJsTaskService() {
  
          player = QueuedAudioPlayer(this@MusicService, playerConfig, bufferConfig, cacheConfig)
          player.automaticallyUpdateNotificationMetadata = automaticallyUpdateNotificationMetadata
@@ -742,7 +831,168 @@ index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..db90840619e760b6991b70b69af925c6
          observeEvents()
          setupForegrounding()
      }
-@@ -741,7 +767,7 @@ class MusicService : HeadlessJsTaskService() {
+@@ -307,7 +383,25 @@ class MusicService : HeadlessJsTaskService() {
+ 
+     @MainThread
+     fun move(fromIndex: Int, toIndex: Int) {
+-        player.move(fromIndex, toIndex);
++        // MeloVault: kotlinaudio's QueuedAudioPlayer.move() moves ExoPlayer's item
++        // correctly but re-inserts its own mirror list at `toIndex - 1` when moving
++        // UP, so that list (what getQueue() returns, and what remove()/skip()
++        // index into) ends up one slot off from what actually plays: "move up"
++        // looked like two slots, rows showed duplicated/missing songs. Put the
++        // moved item where ExoPlayer put it.
++        val mirror = try {
++            QueuedAudioPlayer::class.java.getDeclaredField("queue")
++                .apply { isAccessible = true }
++                .get(player) as? java.util.LinkedList<Any?>
++        } catch (e: Exception) {
++            Log.w("MeloVault", "queue mirror not reachable", e)
++            null
++        }
++        val item = mirror?.getOrNull(fromIndex)
++        player.move(fromIndex, toIndex)
++        if (mirror != null && item != null && mirror.remove(item)) {
++            mirror.add(toIndex.coerceIn(0, mirror.size), item)
++        }
+     }
+ 
+     @MainThread
+@@ -493,8 +587,6 @@ class MusicService : HeadlessJsTaskService() {
+     @MainThread
+     private fun setupForegrounding() {
+         // Implementation based on https://github.com/Automattic/pocket-casts-android/blob/ee8da0c095560ef64a82d3a31464491b8d713104/modules/services/repositories/src/main/java/au/com/shiftyjelly/pocketcasts/repositories/playback/PlaybackService.kt#L218
+-        var notificationId: Int? = null
+-        var notification: Notification? = null
+         var stopForegroundWhenNotOngoing = false
+         var removeNotificationWhenNotOngoing = false
+ 
+@@ -503,34 +595,12 @@ class MusicService : HeadlessJsTaskService() {
+                 Timber.d("skipping foregrounding as the service is already foregrounded")
+                 return
+             }
+-            if (notification == null) {
++            if (fgNotification == null) {
+                 Timber.d("can't startForeground as the notification is null")
+                 return
+             }
+-            try {
+-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+-                    startForeground(
+-                        notificationId!!,
+-                        notification!!,
+-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+-                    )
+-                } else {
+-                    startForeground(notificationId!!, notification)
+-                }
++            if (startForegroundWithMediaNotification()) {
+                 Timber.d("notification has been foregrounded")
+-            } catch (error: Exception) {
+-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+-                    error is ForegroundServiceStartNotAllowedException
+-                ) {
+-                    Timber.e(
+-                        "ForegroundServiceStartNotAllowedException: App tried to start a foreground Service when it was not allowed to do so.",
+-                        error
+-                    )
+-                    emit(MusicEvents.PLAYER_ERROR, Bundle().apply {
+-                        putString("message", error.message)
+-                        putString("code", "android-foreground-service-start-not-allowed")
+-                    });
+-                }
+             }
+         }
+ 
+@@ -560,6 +630,9 @@ class MusicService : HeadlessJsTaskService() {
+                 // state becomes idle after not being idle
+                 stopForegroundWhenNotOngoing = stateCount > 1 && it in BACKGROUNDABLE_STATES
+                 removeNotificationWhenNotOngoing = stopForegroundWhenNotOngoing && it in REMOVABLE_STATES
++                // MeloVault: playback (re)started without the notification being
++                // re-posted as ongoing — make sure we're foregrounded anyway.
++                if (it == AudioPlayerState.PLAYING) startForegroundIfNecessary()
+             }
+         }
+ 
+@@ -567,26 +640,56 @@ class MusicService : HeadlessJsTaskService() {
+             return stopForegroundWhenNotOngoing && (removeNotificationWhenNotOngoing || isForegroundService())
+         }
+ 
++        // MeloVault: every notification post bumps this. A scheduled "leave the
++        // foreground" only runs if no newer notification was posted meanwhile —
++        // upstream re-checked flags that LOADING/BUFFERING states never update,
++        // so the stop queued by reset() (starting a new song) could land AFTER
++        // the new song had already put the service back in the foreground, and
++        // drop it again while the music played (a timing race, far likelier on
++        // a slow phone). Nor do we ever leave while playback is meant to run.
++        var notificationGeneration = 0L
++        val PLAYING_STATES = listOf(
++            AudioPlayerState.LOADING,
++            AudioPlayerState.BUFFERING,
++            AudioPlayerState.READY,
++            AudioPlayerState.PLAYING
++        )
++
+         scope.launch {
+             event.notificationStateChange.collect {
+                 when (it) {
+                     is NotificationState.POSTED -> {
+                         Timber.d("notification posted with id=%s, ongoing=%s", it.notificationId, it.ongoing)
+-                        notificationId = it.notificationId;
+-                        notification = it.notification;
++                        fgNotificationId = it.notificationId;
++                        fgNotification = it.notification;
++                        val generation = ++notificationGeneration
+                         if (it.ongoing) {
+                             if (player.playWhenReady) {
+                                 startForegroundIfNecessary()
+                             }
+                         } else if (shouldStopForeground()) {
+-                            // Allow the application a grace period to complete any actions
+-                            // that may necessitate keeping the service in a foreground state.
+-                            // For instance, queuing new media (e.g., related music) after the
+-                            // user's queue is complete. This prevents the service from potentially
+-                            // being immediately destroyed once the player finishes playing media.
++                            // MeloVault: only leave the foreground once playback has
++                            // REALLY stopped. Momentary non-ongoing states — a seek, the
++                            // gap between tracks, the queue being refilled at its end —
++                            // used to drop the service out of the foreground at once
++                            // (grace 0), and from the background Android 12+ refuses to
++                            // let it back in: playback went on unprotected until the
++                            // low-memory killer took the process. So in the background
++                            // we wait and re-check; the notification's stop button (and
++                            // any stop while the UI is visible, where re-foregrounding is
++                            // allowed) still dismisses the notification instantly.
++                            val userStop = SystemClock.elapsedRealtime() - userStopRequestedAt < USER_STOP_WINDOW_MS
++                            val immediate = removeNotificationWhenNotOngoing &&
++                                (userStop || AppForegroundTracker.foregrounded)
++                            val delayMs = if (immediate) 0L else maxOf(
++                                stopForegroundGracePeriod.toLong() * 1000,
++                                BACKGROUND_STOP_FOREGROUND_DELAY_MS
++                            )
+                             scope.launch {
+-                                delay(stopForegroundGracePeriod.toLong() * 1000)
+-                                if (shouldStopForeground()) {
++                                delay(delayMs)
++                                val superseded = generation != notificationGeneration
++                                val meantToPlay = player.playWhenReady && player.playerState in PLAYING_STATES
++                                if (!superseded && !meantToPlay && shouldStopForeground()) {
+                                     @Suppress("DEPRECATION")
+                                     stopForeground(removeNotificationWhenNotOngoing)
+                                     Timber.d("Notification has been stopped")
+@@ -653,7 +756,10 @@ class MusicService : HeadlessJsTaskService() {
+                     MediaSessionCallback.PAUSE -> emit(MusicEvents.BUTTON_PAUSE)
+                     MediaSessionCallback.NEXT -> emit(MusicEvents.BUTTON_SKIP_NEXT)
+                     MediaSessionCallback.PREVIOUS -> emit(MusicEvents.BUTTON_SKIP_PREVIOUS)
+-                    MediaSessionCallback.STOP -> emit(MusicEvents.BUTTON_STOP)
++                    MediaSessionCallback.STOP -> {
++                        userStopRequestedAt = SystemClock.elapsedRealtime()
++                        emit(MusicEvents.BUTTON_STOP)
++                    }
+                     MediaSessionCallback.FORWARD -> {
+                         Bundle().apply {
+                             val interval = latestOptions?.getDouble(FORWARD_JUMP_INTERVAL_KEY, DEFAULT_JUMP_INTERVAL) ?: DEFAULT_JUMP_INTERVAL
+@@ -741,7 +847,7 @@ class MusicService : HeadlessJsTaskService() {
  
      @MainThread
      private fun emit(event: String, data: Bundle? = null) {
@@ -751,7 +1001,7 @@ index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..db90840619e760b6991b70b69af925c6
              ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
              ?.emit(event, data?.let { Arguments.fromBundle(it) })
      }
-@@ -751,7 +777,7 @@ class MusicService : HeadlessJsTaskService() {
+@@ -751,7 +857,7 @@ class MusicService : HeadlessJsTaskService() {
          val payload = Arguments.createArray()
          data.forEach { payload.pushMap(Arguments.fromBundle(it)) }
  
@@ -760,11 +1010,14 @@ index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..db90840619e760b6991b70b69af925c6
              ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
              ?.emit(event, payload)
      }
-@@ -849,6 +875,6 @@ class MusicService : HeadlessJsTaskService() {
+@@ -849,6 +955,9 @@ class MusicService : HeadlessJsTaskService() {
          const val IS_PAUSED_KEY = "paused"
  
          const val DEFAULT_JUMP_INTERVAL = 15.0
 -        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 5
 +        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 0
++        // MeloVault: how long a background, non-user stop keeps the foreground.
++        const val BACKGROUND_STOP_FOREGROUND_DELAY_MS = 5000L
++        const val USER_STOP_WINDOW_MS = 10_000L
      }
  }

@@ -11,6 +11,7 @@ import { SongRepository } from '@/features/library/data/repositories/SongReposit
 import { SongListItem } from '@/features/player/presentation/components/SongListItem';
 import { TrackPlayerService } from '@/infrastructure/audio/TrackPlayerService';
 import { resolveResumePosition } from '@/features/player/domain/usecases/resumePosition';
+import { usePlayerStore } from '@/features/player/store/playerStore';
 import type { Song } from '@/shared/types';
 import { useActiveTrack } from 'react-native-track-player';
 
@@ -55,7 +56,15 @@ export function SearchScreen() {
   const playSong = useCallback(async (song: Song) => {
     const index = results.findIndex(s => s.id === song.id);
     const startPositionMs = await resolveResumePosition(song);
-    await audioService.setQueue(results.length > 0 ? results : [song], index >= 0 ? index : 0, startPositionMs);
+    const list = results.length > 0 ? results : [song];
+    const startIndex = index >= 0 ? index : 0;
+    // Tell the store what is actually queued: the endless-queue loop and the
+    // saved session re-queue from it, and without this they kept using the
+    // previous screen's list (the next lap after a search played the library).
+    const store = usePlayerStore.getState();
+    store.setCurrentSong(song);
+    store.setQueue(list, startIndex, list);
+    await audioService.setQueue(list, startIndex, startPositionMs);
   }, [results]);
 
   const clearSearch = () => {

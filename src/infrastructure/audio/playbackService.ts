@@ -138,24 +138,41 @@ export async function PlaybackService() {
   // for the cases where that append couldn't run (store not populated yet, a
   // native add() that failed…), rebuilding the set from scratch instead of
   // stopping. It only fires in RepeatMode.Off ('none') — RepeatMode.Track/'one'
-  // and RepeatMode.Queue/'all' loop natively and never emit this event. Only
-  // truly empty queues fall through to stop().
+  // and RepeatMode.Queue/'all' loop natively and never emit this event.
+  //
+  // It appends + skips instead of reset()ing: this usually runs in the
+  // background, and reset() drops the player to IDLE, which is exactly the kind
+  // of stop that takes the service out of the foreground.
   TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
     await savePositionOnTrackChange();
 
-    const { shuffleEnabled, originalQueue, queue, queueContextId, setQueue } =
-      usePlayerStore.getState();
-    const base = originalQueue.length > 0 ? originalQueue : queue;
-    if (base.length === 0) {
-      await TrackPlayer.stop();
-      return;
-    }
+    try {
+      const { shuffleEnabled, originalQueue, queue, queueContextId, setQueue } =
+        usePlayerStore.getState();
+      const base = originalQueue.length > 0 ? originalQueue : queue;
+      if (base.length === 0) {
+        // No queue known to the store (e.g. a lone song loaded some other way):
+        // start the player's own queue over rather than going silent.
+        if ((await TrackPlayer.getQueue()).length === 0) return;
+        await TrackPlayer.skip(0, 0);
+        await TrackPlayer.play();
+        return;
+      }
 
-    const nextOrder = shuffleEnabled ? shuffle(base) : base;
-    // Suppress the track-change save that reset() would trigger with the stale
-    // end-of-queue position, so it can't clobber the per-song resume points.
-    skipNextTrackChangeSave();
-    setQueue(nextOrder, 0, base, queueContextId);
-    await audioService.setQueue(nextOrder, 0, 0);
+      const nextOrder = shuffleEnabled ? shuffle(base) : base;
+      // Suppress the track-change save with the stale end-of-queue position, so
+      // it can't clobber the per-song resume points.
+      skipNextTrackChangeSave();
+      setQueue(nextOrder, 0, base, queueContextId);
+      const startIndex = (await TrackPlayer.getQueue()).length;
+      await TrackPlayer.add(nextOrder.map(s => audioService.songToTrack(s)));
+      await TrackPlayer.skip(startIndex, 0);
+      await TrackPlayer.play();
+    } catch {
+      // Last resort: rebuild from scratch (reset + add + play).
+      const { originalQueue, queue } = usePlayerStore.getState();
+      const base = originalQueue.length > 0 ? originalQueue : queue;
+      if (base.length > 0) await audioService.setQueue(base, 0, 0);
+    }
   });
 }
