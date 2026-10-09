@@ -28,7 +28,9 @@ export function FavoritesScreen({ visible, onClose }: { visible: boolean; onClos
   const favoriteIds = useFavoritesStore(s => s.favoriteIds);
   const toggleFavorite = useFavoritesStore(s => s.toggleFavorite);
   const [songs, setSongs] = useState<Song[]>([]);
-  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
+  // Actions only (stable refs): subscribing to the whole store re-rendered this
+  // list on every player change, delaying the tap → playback hand-off.
+  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore.getState();
 
   // Re-resolve the favorited songs whenever the set changes or we open.
   useEffect(() => {

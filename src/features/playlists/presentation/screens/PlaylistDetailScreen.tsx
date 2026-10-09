@@ -194,7 +194,9 @@ export function PlaylistDetailScreen({
   const palette = useTheme();
   const [songs, setSongs] = useState<Song[]>([]);
   const [showPicker, setShowPicker] = useState(false);
-  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
+  // Actions only (stable refs): subscribing to the whole store re-rendered this
+  // list on every player change, delaying the tap → playback hand-off.
+  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore.getState();
 
   const load = useCallback(async () => {
     if (!playlist) return;

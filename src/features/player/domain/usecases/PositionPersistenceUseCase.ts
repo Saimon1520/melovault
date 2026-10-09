@@ -152,6 +152,10 @@ export async function savePositionOnTrackChange(
       skipNextTrackChangeSaveFlag = false;
       return; // the stop handler already saved the exact position — don't clobber it
     }
+    // A queue rebuild swaps the active track in place with load(), after which
+    // RNTP reports `lastTrack` from the already-replaced list — a different song
+    // (or the new one) paired with the old song's position. Never save that.
+    if (TrackPlayerService.getInstance().isLoadingQueue()) return;
     const lastId = event?.lastTrack?.id;
     const lastPos = event?.lastPosition ?? 0;
     if (lastId == null || lastPos < 1) return;
@@ -183,13 +187,9 @@ async function restoreSavedQueue(song: Song, positionSec: number): Promise<boole
   store.setShuffleEnabled(saved.shuffle);
   store.setQueue(songs, index, original, saved.contextId);
 
-  const audioService = TrackPlayerService.getInstance();
-  await TrackPlayer.add(songs.map(s => audioService.songToTrack(s)));
-  if (index > 0) {
-    await TrackPlayer.skip(index, positionSec);
-  } else if (positionSec > 0) {
-    await TrackPlayer.seekTo(positionSec);
-  }
+  // Load with the saved song active from the start (not add-all + skip, which
+  // briefly announced the queue's first song instead).
+  await TrackPlayerService.getInstance().loadQueue(songs, index, positionSec);
   return true;
 }
 

@@ -106,7 +106,9 @@ export function LibraryPlaceholder() {
   const { isScanning, scanProgress, startScan } = useLibraryScan();
   const autoScanRunning = useRef(false);
   const activeTrack = useActiveTrack();
-  const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore();
+  // Actions only (stable refs): subscribing to the whole store re-rendered this
+  // list on every player change, delaying the tap → playback hand-off.
+  const { setCurrentSong, setQueue, setQueueIndex } = usePlayerStore.getState();
   // Re-derive archived split whenever the user archives/restores something.
   const archivedIds = useArchiveStore(s => s.archivedIds);
   const unarchivedIds = useArchiveStore(s => s.unarchivedIds);

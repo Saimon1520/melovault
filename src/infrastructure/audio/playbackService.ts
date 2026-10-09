@@ -17,6 +17,13 @@ const audioService = TrackPlayerService.getInstance();
 // Runs in a dedicated JS thread for background audio playback.
 // Registered in index.js via TrackPlayer.registerPlaybackService()
 export async function PlaybackService() {
+  // A queue rebuild holds off the end-of-queue check (see TrackPlayerService
+  // loadTracks); run it once the queue is complete.
+  audioService.onQueueLoaded = () => {
+    resetQueueLoopCheck();
+    ensureEndlessQueue();
+  };
+
   // ── Notification / hardware button controls ──────────────────────────────
   TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
@@ -68,7 +75,12 @@ export async function PlaybackService() {
       const newId = event.track?.id ?? (await TrackPlayer.getActiveTrack())?.id;
       if (newId != null) {
         const song = await songRepo.getById(String(newId));
-        if (song) usePlayerStore.getState().setCurrentSong(song);
+        // Two quick changes can resolve out of order; never let a stale lookup
+        // overwrite the song that's actually active now.
+        const stillActive = (await TrackPlayer.getActiveTrack())?.id;
+        if (song && String(stillActive) === String(newId)) {
+          usePlayerStore.getState().setCurrentSong(song);
+        }
       }
     } catch { /* ignore */ }
     const crossfadeMs = useSettingsStore.getState().crossfadeMs;

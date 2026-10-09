@@ -41,7 +41,9 @@ export function RecentlyAddedScreen({ visible, onClose }: { visible: boolean; on
   // Persisted, so the range the user last looked at is the one that opens.
   const dateFilter = useLibraryPrefsStore(s => s.recentFilter);
   const setDateFilter = useLibraryPrefsStore(s => s.setRecentFilter);
-  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore();
+  // Actions only (stable refs): subscribing to the whole store re-rendered this
+  // list on every player change, delaying the tap → playback hand-off.
+  const { setCurrentSong, setQueue, setQueueIndex, setShuffleEnabled } = usePlayerStore.getState();
   // Re-derive when the user archives/restores something.
   const archivedIds = useArchiveStore(s => s.archivedIds);
   const unarchivedIds = useArchiveStore(s => s.unarchivedIds);

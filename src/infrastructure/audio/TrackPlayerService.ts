@@ -134,20 +134,90 @@ export class TrackPlayerService {
   }
 
   async setQueue(songs: Song[], startIndex = 0, positionMs = 0): Promise<void> {
-    const tracks = songs.map(s => this.songToTrack(s));
     await FadeController.getInstance().reset();
-    await TrackPlayer.reset();
-    await TrackPlayer.add(tracks);
-    await this.reapplyRepeatMode();
-    // skip(index, initialTime) moves to the start track AND seeks in one native
-    // call. Skipping to index 0 is a no-op move, so only issue it when we
-    // actually need to change index or seek — a redundant skip(0) re-prepares
-    // the source and can race the play() below (the old "tap twice to play" bug).
-    if (startIndex > 0 || positionMs > 0) {
-      await TrackPlayer.skip(startIndex, positionMs > 0 ? positionMs / 1000 : 0);
-    }
-    await TrackPlayer.play();
+    await this.loadTracks(songs.map(s => this.songToTrack(s)), startIndex, positionMs / 1000, async () => {
+      await this.reapplyRepeatMode();
+      await TrackPlayer.play();
+    });
     this.assertPlaying();
+  }
+
+  // Rebuilds the queue around `songs[startIndex]` without ever emptying it and
+  // without the chosen song ever being anything but the active track.
+  //
+  // The old reset() → add(all) → skip(index) made index 0 the active track for
+  // a moment: it was announced to the mini player, the notification and
+  // Bluetooth (the "first it shows the last song I downloaded" bug). And RNTP's
+  // reset() is stop() → delay(300) → clear(): 300 ms of forced silence, during
+  // which anything else sent to the player gets wiped by the late clear().
+  //
+  // Instead: load() swaps the chosen track in place of the active one (a single
+  // track change, straight from the old song to the new one), the old queue
+  // around it is dropped, the following tracks are appended, `beforeStart` runs
+  // (play), and only then are the earlier tracks inserted in front — inserting
+  // before the active item doesn't change it, so no second track change fires.
+  async loadQueue(songs: Song[], startIndex: number, positionSec: number): Promise<void> {
+    await this.loadTracks(songs.map(s => this.songToTrack(s)), startIndex, positionSec);
+  }
+
+  // Bumped by every load, so an older one still in flight knows it was superseded.
+  private loadGeneration = 0;
+  private loadingGeneration: number | null = null;
+  // Set by the playback service: re-runs the end-of-queue check that was held
+  // off while the queue was being rebuilt.
+  onQueueLoaded: (() => void) | null = null;
+
+  // True while a load is rebuilding the queue. The endless-queue check must not
+  // look at it then: mid-rebuild the chosen song can briefly be the last track,
+  // and appending a lap there would land it before the rest of the list.
+  isLoadingQueue(): boolean {
+    return this.loadingGeneration !== null;
+  }
+
+  private async loadTracks(
+    tracks: Track[],
+    startIndex: number,
+    positionSec: number,
+    beforeStart?: () => Promise<void>,
+  ): Promise<void> {
+    if (tracks.length === 0) return;
+    const generation = ++this.loadGeneration;
+    this.loadingGeneration = generation;
+    const superseded = () => generation !== this.loadGeneration;
+    try {
+      const start = Math.min(Math.max(startIndex, 0), tracks.length - 1);
+      const chosen = tracks[start]!;
+      // load() keeps playing if the old song was, so a song that resumes
+      // mid-way would blip from 0:00 until the seek below — hold it first.
+      if (positionSec > 0) await TrackPlayer.pause();
+      // A newer load bumps the generation synchronously before sending anything
+      // to the player, so checking right before each step guarantees this one
+      // never mutates the queue after the newer one has started on it. Into an
+      // empty player load() simply adds the track.
+      await TrackPlayer.load(chosen);
+      if (superseded()) return;
+      await TrackPlayer.removeUpcomingTracks();
+      const loadedAt = (await TrackPlayer.getActiveTrackIndex()) ?? 0;
+      if (superseded()) return;
+      if (loadedAt > 0) await TrackPlayer.remove(Array.from({ length: loadedAt }, (_, i) => i));
+      if (superseded()) return;
+      if (start < tracks.length - 1) await TrackPlayer.add(tracks.slice(start + 1));
+      if (superseded()) return;
+      if (positionSec > 0) await TrackPlayer.seekTo(positionSec);
+      if (beforeStart) await beforeStart();
+      if (start === 0) return;
+      // Something else replaced or cleared the queue meanwhile (another tap, the
+      // notification's stop): inserting now would push these songs into a queue
+      // that isn't ours — or start them in an empty one.
+      const active = await TrackPlayer.getActiveTrack();
+      if (superseded() || active?.id !== chosen.id) return;
+      await TrackPlayer.add(tracks.slice(0, start), 0);
+    } finally {
+      if (this.loadingGeneration === generation) {
+        this.loadingGeneration = null;
+        this.onQueueLoaded?.();
+      }
+    }
   }
 
   // RNTP can occasionally drop the first play() issued right after reset()/add()

@@ -48,6 +48,8 @@ export function hasProgressCheckRun(): boolean {
  */
 export async function ensureEndlessQueue(): Promise<void> {
   if (appending) return;
+  // A queue rebuild is in flight; it re-runs this check once it's done.
+  if (TrackPlayerService.getInstance().isLoadingQueue()) return;
   appending = true;
   try {
     const { repeatMode, shuffleEnabled, originalQueue, queue } = usePlayerStore.getState();
