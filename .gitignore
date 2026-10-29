@@ -59,3 +59,8 @@ ios/build/
 *.local.md
 .device.local.*
 .claude/scheduled_tasks.lock
+
+# Clave de firma de release (vive en ~/.config/melovault, nunca en el repo)
+*.keystore
+!android/app/debug.keystore
+signing.properties

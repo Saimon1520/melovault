@@ -3,11 +3,18 @@
 Para que Android **actualice** MeloVault sobre la versión instalada (en vez de
 pedir instalar de cero), cada release debe cumplir 2 cosas:
 
-1. **Misma clave de firma.** Todas las releases se firman con
-   `android/app/melovault-release.keystore` (alias `melovault`). Ya está
-   configurado en `android/app/build.gradle` (`signingConfigs.release`), así que
-   `assembleRelease` lo usa automáticamente. **No borres ni regeneres ese
-   keystore** o se romperán las actualizaciones (habría que desinstalar otra vez).
+1. **Misma clave de firma.** Todas las releases se firman con la clave privada
+   `~/.config/melovault/melovault-release.keystore` (alias `melovault`), que vive
+   **fuera del repo**. `android/app/build.gradle` lee la ruta y las contraseñas de
+   `~/.config/melovault/signing.properties` (o del archivo que indique la variable
+   `MELOVAULT_SIGNING`); si no existe, `assembleRelease` genera un APK **sin firmar**.
+   **Nunca subas el keystore ni `signing.properties` a git** y guarda un respaldo
+   de ambos (por ejemplo en tu gestor de contraseñas): si se pierden, las
+   actualizaciones se rompen y habría que desinstalar otra vez.
+
+   > Rotación 29-oct-2026: la clave anterior estuvo publicada en el repo y se
+   > reemplazó. La primera versión firmada con la clave nueva **no actualiza
+   > in-place**: hay que desinstalar MeloVault e instalarlo de nuevo una sola vez.
 
 2. **`versionCode` mayor.** Sube `versionCode` (y normalmente `versionName`) en
    `android/app/build.gradle` › `defaultConfig` en cada release:

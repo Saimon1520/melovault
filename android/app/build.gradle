@@ -81,6 +81,16 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Firma de release: propiedades privadas fuera del repo (ruta por MELOVAULT_SIGNING o
+// ~/.config/melovault/signing.properties). Sin ellas, assembleRelease genera un APK sin firmar.
+def releaseSigningFile = file(System.getenv('MELOVAULT_SIGNING') ?: "${System.getProperty('user.home')}/.config/melovault/signing.properties")
+def releaseSigning = new Properties()
+if (releaseSigningFile.exists()) {
+    releaseSigningFile.withInputStream { releaseSigning.load(it) }
+} else {
+    logger.warn("MeloVault: no se encontró ${releaseSigningFile}; el APK de release saldrá sin firmar.")
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -105,12 +115,14 @@ android {
             keyPassword 'android'
         }
         release {
-            // Stable MeloVault signing key — every release MUST be signed with
-            // this so Android updates in place instead of refusing the install.
-            storeFile file('melovault-release.keystore')
-            storePassword 'melovault'
-            keyAlias 'melovault'
-            keyPassword 'melovault'
+            // Clave de firma de MeloVault: vive FUERA del repo (ver RELEASING.md).
+            // Todas las releases deben firmarse con ella para actualizar in-place.
+            if (releaseSigning['storeFile']) {
+                storeFile file(releaseSigning['storeFile'])
+                storePassword releaseSigning['storePassword']
+                keyAlias releaseSigning['keyAlias']
+                keyPassword releaseSigning['keyPassword']
+            }
         }
     }
     buildTypes {
@@ -118,7 +130,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.release
+            signingConfig releaseSigning['storeFile'] ? signingConfigs.release : null
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
