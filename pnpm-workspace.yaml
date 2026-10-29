@@ -8,3 +8,6 @@ overrides:
   image-size@<2.0.3: ^2.0.3
   "@babel/runtime@<7.26.10": ^7.26.10
   baseline-browser-mapping@>=2.0.0 <2.11.0: ^2.11.0
+  # Sin versión corregida publicada: copias locales con el parche (ver vendor/).
+  deepmerge: file:./vendor/deepmerge
+  zod@3: file:./vendor/zod-v3

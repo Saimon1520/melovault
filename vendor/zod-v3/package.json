@@ -1,0 +1,20 @@
+{
+  "name": "zod",
+  "version": "3.25.76",
+  "description": "Puente local: expone la API v3 de zod desde zod 4.6.7 (incluye el arreglo de GHSA-mrhx-c7xc-m3w5). La API v3 de zod 4 es el mismo código que zod 3.25.76 más correcciones de seguridad.",
+  "license": "MIT",
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "types": "./index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./index.d.cts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "zod-4": "npm:zod@4.6.7"
+  }
+}
